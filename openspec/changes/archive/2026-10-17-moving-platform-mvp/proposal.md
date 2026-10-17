@@ -12,7 +12,7 @@ LM Rapid Transport necesita centralizar la recepción de solicitudes, las cotiza
 - Registrar aprobación interna, comunicación y confirmación manual del cliente; calcular el total con horas o millas reales y conservar historial de cambios monetarios y de cantidades.
 - Gestionar solicitudes, clientes, notas, mudanzas, cancelación/reactivación y métricas básicas; programar de lunes a sábado sin control automático de disponibilidad.
 - Entregar migraciones, RLS, Storage privado, datos ficticios, pruebas críticas y documentación para Seenode y Cloudflare.
-- En esta etapa se crean únicamente artefactos OpenSpec: la implementación requiere una instrucción posterior del usuario.
+- La propuesta documental se completó el 2026-10-07; la implementación fue autorizada por el usuario el 2026-10-08 mediante openspec-apply-change. No se autoriza despliegue remoto automático.
 
 ## Capabilities
 

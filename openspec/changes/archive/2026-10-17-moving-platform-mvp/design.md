@@ -1,6 +1,6 @@
 ## Context
 
-Este cambio documenta el MVP de **LM Rapid Transport**. El usuario autorizó análisis y artefactos OpenSpec, no implementación. El repositorio inspeccionado contiene un README de prueba, configuración de OpenSpec y skills; no hay aplicación ni migraciones existentes.
+Este cambio documenta el MVP de **LM Rapid Transport**. La propuesta se preparó sin implementación el 2026-10-07. El usuario autorizó aplicar el cambio el 2026-10-08 mediante openspec-apply-change. Al iniciar la propuesta el repositorio contenía un README de prueba, configuración de OpenSpec y skills; no había aplicación ni migraciones existentes.
 
 Las aclaraciones posteriores sustituyen el alcance original donde hay diferencias: solo Seenode, email del cliente opcional, tarifas con impuestos incluidos, sin descuentos/cargos extra/objetos especiales, permisos ampliados para DISPATCHER, fechas flexibles y confirmación manual. La URL y clave pública de Supabase compartidas en la conversación no se copian a los artefactos; se usarán variables de entorno en la implementación.
 

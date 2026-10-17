@@ -1,0 +1,9 @@
+{
+  "name": "@lm/types",
+  "private": true,
+  "version": "0.0.0",
+  "exports": {
+    ".": "./src/index.ts",
+    "./database": "./src/database.generated.ts"
+  }
+}

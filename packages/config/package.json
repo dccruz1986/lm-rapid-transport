@@ -1,0 +1,12 @@
+{
+  "name": "@lm/config",
+  "private": true,
+  "version": "0.0.0",
+  "exports": {
+    "./env": "./env.ts",
+    "./tsconfig.base.json": "./tsconfig.base.json"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  }
+}

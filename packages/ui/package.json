@@ -1,0 +1,20 @@
+{
+  "name": "@lm/ui",
+  "private": true,
+  "version": "0.0.0",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css",
+    "./*": "./src/*.tsx"
+  },
+  "dependencies": {
+    "tailwindcss": "4.3.3",
+    "@lm/types": "workspace:*",
+    "@radix-ui/react-slot": "latest",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "latest",
+    "react": "19.3.0",
+    "lucide-react": "latest"
+  }
+}
