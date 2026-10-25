@@ -61,6 +61,23 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       moveId={move.data?.id ?? null}
     >
       <Workflow
+        routeReady={
+          record.data.intake_version !== 2 ||
+          Boolean(
+            record.data.territorial_reviewed &&
+              record.data.suggested_mode &&
+              record.data.suggested_mode === quote.data?.mode &&
+              [record.data.origin, record.data.destination].every(
+                (address) =>
+                  address?.street &&
+                  address.city &&
+                  address.postal_code &&
+                  address.state === "FL" &&
+                  address.country === "US" &&
+                  address.county,
+              ),
+          )
+        }
         request={record.data}
         quote={quote.data}
         move={move.data}

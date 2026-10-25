@@ -5,7 +5,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { FormResult } from "@/components/record-ui";
 
-const identity = z.object({ request: z.uuid(), version: z.coerce.number().int().min(0) });
+const identity = z.object({
+  request: z.uuid(),
+  version: z.coerce.number().int().min(0),
+});
 const text = (f: FormData, name: string) => String(f.get(name) ?? "");
 function response(error: { message: string } | null): FormResult {
   if (!error) {
@@ -14,14 +17,21 @@ function response(error: { message: string } | null): FormResult {
   }
   return {
     error:
-      ["CONFLICT", "FORBIDDEN", "INVALID_INPUT", "INVALID_TRANSITION"].find((c) =>
-        error.message.includes(c),
-      ) ?? "UNAVAILABLE",
+      [
+        "ROUTE_REVIEW_REQUIRED",
+        "CONFLICT",
+        "FORBIDDEN",
+        "INVALID_INPUT",
+        "INVALID_TRANSITION",
+      ].find((c) => error.message.includes(c)) ?? "UNAVAILABLE",
     success: false,
   };
 }
 const invalid: FormResult = { error: "INVALID_INPUT", success: false };
-export async function saveQuote(_previous: FormResult, form: FormData): Promise<FormResult> {
+export async function saveQuote(
+  _previous: FormResult,
+  form: FormData,
+): Promise<FormResult> {
   const { db } = await requireStaff("quotes.edit");
   const id = identity.safeParse(Object.fromEntries(form));
   let rate: number;
@@ -50,11 +60,16 @@ export async function saveQuote(_previous: FormResult, form: FormData): Promise<
     ).error,
   );
 }
-export async function quoteAction(_previous: FormResult, form: FormData): Promise<FormResult> {
+export async function quoteAction(
+  _previous: FormResult,
+  form: FormData,
+): Promise<FormResult> {
   const id = identity.safeParse(Object.fromEntries(form));
   const action = text(form, "action");
   if (!id.success || !["approve", "reopen"].includes(action)) return invalid;
-  const { db } = await requireStaff(action === "approve" ? "quotes.approve" : "quotes.edit");
+  const { db } = await requireStaff(
+    action === "approve" ? "quotes.approve" : "quotes.edit",
+  );
   return response(
     (
       await db.rpc(action === "approve" ? "approve_quote" : "reopen_quote", {
@@ -64,18 +79,25 @@ export async function quoteAction(_previous: FormResult, form: FormData): Promis
     ).error,
   );
 }
-export async function communicateQuote(_previous: FormResult, form: FormData): Promise<FormResult> {
+export async function communicateQuote(
+  _previous: FormResult,
+  form: FormData,
+): Promise<FormResult> {
   const { db } = await requireStaff("quotes.confirm");
   const id = identity.safeParse(Object.fromEntries(form));
-  const medium = z.enum(["PHONE", "WHATSAPP", "EMAIL"]).safeParse(text(form, "medium"));
-  if (!id.success || !medium.success || text(form, "response").length > 2000) return invalid;
+  const medium = z
+    .enum(["PHONE", "WHATSAPP", "EMAIL"])
+    .safeParse(text(form, "medium"));
+  if (!id.success || !medium.success || text(form, "response").length > 2000)
+    return invalid;
   let at: string;
   try {
     at = miamiInstant(text(form, "at"), text(form, "at_offset"));
   } catch {
     return invalid;
   }
-  return response(
+  console.log("form", form);
+  const responseControl: FormResult = response(
     (
       await db.rpc("communicate_quote", {
         p_request: id.data.request,
@@ -87,11 +109,19 @@ export async function communicateQuote(_previous: FormResult, form: FormData): P
       })
     ).error,
   );
+  console.log("response", responseControl);
+  return responseControl;
 }
-export async function scheduleMove(_previous: FormResult, form: FormData): Promise<FormResult> {
+export async function scheduleMove(
+  _previous: FormResult,
+  form: FormData,
+): Promise<FormResult> {
   const { db } = await requireStaff("moves.schedule");
   const id = identity
-    .extend({ duration: z.coerce.number().int().min(1).max(10080), notes: z.string().max(4000) })
+    .extend({
+      duration: z.coerce.number().int().min(1).max(10080),
+      notes: z.string().max(4000),
+    })
     .safeParse(Object.fromEntries(form));
   if (!id.success) return invalid;
   let at: string;
@@ -112,22 +142,41 @@ export async function scheduleMove(_previous: FormResult, form: FormData): Promi
     ).error,
   );
 }
-export async function recordMove(_previous: FormResult, form: FormData): Promise<FormResult> {
+export async function recordMove(
+  _previous: FormResult,
+  form: FormData,
+): Promise<FormResult> {
   const { db } = await requireStaff("moves.operate");
   const id = identity.safeParse(Object.fromEntries(form));
-  const action = z.enum(["start", "save", "complete", "correct"]).safeParse(text(form, "action"));
+  const action = z
+    .enum(["start", "save", "complete", "correct"])
+    .safeParse(text(form, "action"));
   if (!id.success || !action.success) return invalid;
   let start: string;
   let end: string | undefined;
   try {
     start = miamiInstant(text(form, "start"), text(form, "start_offset"));
-    if (text(form, "end")) end = miamiInstant(text(form, "end"), text(form, "end_offset"));
+    if (text(form, "end"))
+      end = miamiInstant(text(form, "end"), text(form, "end_offset"));
   } catch {
     return invalid;
   }
   const miles = text(form, "miles") ? Number(text(form, "miles")) : undefined;
-  if (miles !== undefined && (!Number.isFinite(miles) || miles <= 0 || miles > 10000)) return invalid;
-  return response(
+  if (
+    miles !== undefined &&
+    (!Number.isFinite(miles) || miles <= 0 || miles > 10000)
+  )
+    return invalid;
+
+  console.log("recordMove", {
+    id: id.data,
+    action: action.data,
+    start,
+    end,
+    miles,
+    form,
+  });
+  const responseControl: FormResult = response(
     (
       await db.rpc("record_move", {
         p_request: id.data.request,
@@ -139,4 +188,6 @@ export async function recordMove(_previous: FormResult, form: FormData): Promise
       })
     ).error,
   );
+  console.log("recordMove response", responseControl);
+  return responseControl;
 }

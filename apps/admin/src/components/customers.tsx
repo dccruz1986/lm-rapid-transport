@@ -1,6 +1,7 @@
 "use client";
 import type { Database } from "@lm/types/database";
 import { Button, EmptyState, useLanguage } from "@lm/ui";
+import { displayName } from "@lm/validation";
 import { CustomerEditor } from "./record-forms";
 import { DateText, PageHeading, Pagination, StatusBadge } from "./record-ui";
 import { type RequestListRow, RequestTable } from "./request-list";
@@ -46,7 +47,7 @@ export function CustomerList({
                 <tr key={c.id}>
                   <td>
                     <a className="record-link" href={`/customers/${c.id}`}>
-                      {c.first_name} {c.last_name}
+                      {displayName(c)}
                     </a>
                   </td>
                   <td>{c.phone}</td>
@@ -81,12 +82,9 @@ export function CustomerDetail({
   return (
     <div className="stack">
       <a href="/customers">← {t("Clientes", "Customers")}</a>
-      <PageHeading
-        es={`${customer.first_name} ${customer.last_name}`}
-        en={`${customer.first_name} ${customer.last_name}`}
-      />
+      <PageHeading es={displayName(customer)} en={displayName(customer)} />
       {canEdit ? (
-        <CustomerEditor customer={customer} />
+        <CustomerEditor key={customer.version} customer={customer} />
       ) : (
         <p>
           {customer.phone} · {customer.email}

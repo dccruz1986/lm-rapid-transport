@@ -6,11 +6,23 @@ Definir las modalidades, tarifas, cálculos, aprobación y confirmación de coti
 ## Requirements
 
 ### Requirement: Modalidad territorial de cotización
-El personal SHALL clasificar como LOCAL una mudanza con origen y destino dentro del municipio de Miami, y como PER_MILE si alguno está fuera de ese municipio. Ambos extremos SHALL estar dentro de Florida. El nombre postal Miami no SHALL usarse como prueba automática del límite municipal.
+El sistema SHALL sugerir LOCAL por hora cuando ambos extremos estén en el condado Miami-Dade, incluidas sus distintas ciudades y áreas no incorporadas; SHALL sugerir PER_MILE si al menos uno está fuera del condado y ambos están dentro de Florida. La clasificación SHALL usar resolución territorial verificada en servidor. ZIP aproximado SHALL generar solo sugerencia provisional; casos inciertos SHALL quedar pendientes de revisión. La aprobación interna LOCAL SHALL permitir direcciones pendientes. El personal SHALL confirmar las direcciones completas y resolver la clasificación antes de confirmar/programar o aprobar PER_MILE. El nombre postal Miami no SHALL usarse como prueba de pertenencia. Cambios de esta regla no SHALL alterar condiciones de cotizaciones históricas automáticamente.
 
 #### Scenario: Origen Miami y destino otra ciudad de Florida
-- **WHEN** el personal confirma que un extremo está fuera de la ciudad de Miami
+- **WHEN** el destino está fuera de Miami-Dade y ambos extremos están en Florida
 - **THEN** la cotización usa PER_MILE y no la tarifa local por horas
+
+#### Scenario: Otra ciudad dentro de Miami-Dade
+- **WHEN** origen y destino están verificados dentro de Miami-Dade aunque uno esté en Hialeah y otro en Miami Beach
+- **THEN** se sugiere LOCAL y al aprobar se usa tarifa por hora del equipo según Configuración
+
+#### Scenario: ZIP insuficiente
+- **WHEN** una solicitud solo tiene ZIP ambiguo o datos manuales sin verificar
+- **THEN** queda pendiente la clasificación y no se aprueba una cotización con modalidad asignada por defecto
+
+#### Scenario: Cotización histórica
+- **WHEN** entra en vigor el alcance de todo Miami-Dade
+- **THEN** una cotización existente conserva modo y tarifa; cualquier cambio explícito mantiene las reglas de reconfirmación comercial
 
 ### Requirement: Tarifas generales iniciales y alcance
 El tarifario SHALL comenzar con 119 USD/h para dos trabajadores, 145 USD/h para tres y 165 USD/h para cuatro, camión incluido; PER_MILE SHALL comenzar en 4 USD/milla para cualquier equipo de 2/3/4. El mínimo local SHALL comenzar en tres horas para todos los equipos. ADMIN/MANAGER SHALL editar el tarifario y mínimo general. Las mismas reglas SHALL aplicarse a residencias, oficinas y comercios conservando su clasificación para cambios futuros.
@@ -105,3 +117,34 @@ El servidor/DB SHALL validar cantidades/tarifas, rechazar negativos, valores no 
 #### Scenario: Total adulterado u operación obsoleta
 - **WHEN** el navegador envía un total manipulado o una edición basada en una versión anterior
 - **THEN** el servidor ignora/rechaza el total no autoritativo y rechaza el conflicto de versión sin perder los cambios concurrentes
+
+### Requirement: Tarifa configurada al seleccionar equipo o modalidad
+El editor SHALL actualizar inmediatamente el campo de tarifa y su vista previa cuando el personal cambie «Trabajadores + camión» o modalidad, en cotizaciones nuevas y existentes. SHALL usar la configuración cargada: tarifa horaria del equipo de 2/3/4 en LOCAL y tarifa común por milla en PER_MILE, convirtiendo centavos a USD con dos decimales. La selección SHALL sustituir un ajuste manual previo y SHALL permitir editar la tarifa nuevamente. Al abrir una cotización existente, el editor SHALL conservar su tarifa guardada hasta una selección explícita o edición manual. La selección no SHALL persistir cambios hasta guardar ni alterar el mínimo copiado; al guardar SHALL mantener las validaciones, concurrencia y reconfirmación comercial existentes.
+
+#### Scenario: Cambio de equipo en cotización existente
+- **WHEN** el personal cambia una cotización LOCAL de dos a tres trabajadores y la configuración cargada define 152.50 USD/h para tres
+- **THEN** el campo muestra 152.50 y la vista previa usa ese importe con la cantidad y mínimo vigentes, sin guardar todavía
+
+#### Scenario: Todos los equipos en una cotización nueva
+- **WHEN** el personal selecciona sucesivamente dos, cuatro y tres trabajadores en una cotización LOCAL nueva
+- **THEN** cada selección carga respectivamente hourly_two, hourly_four y hourly_three desde Configuración, sin precios fijos en el componente
+
+#### Scenario: Cotización por millas
+- **WHEN** cambia el equipo en PER_MILE y la configuración cargada define 4.75 USD/milla
+- **THEN** la tarifa muestra 4.75 con cualquier equipo y la vista previa usa las millas estimadas
+
+#### Scenario: Cambio de modalidad
+- **WHEN** cambia de LOCAL a PER_MILE o de PER_MILE a LOCAL
+- **THEN** la tarifa usa respectivamente per_mile o la tarifa horaria configurada del equipo seleccionado, y se actualiza la vista previa
+
+#### Scenario: Preservación del snapshot al abrir
+- **WHEN** se abre una cotización guardada a 119 USD/h y la configuración actual indica 130 USD/h para su equipo
+- **THEN** permanece 119 USD/h mientras no cambie explícitamente equipo, modalidad o tarifa
+
+#### Scenario: Ajuste manual y nueva selección
+- **WHEN** el personal introduce una tarifa manual y después cambia el equipo
+- **THEN** se carga la tarifa configurada de esa selección y puede introducir otro ajuste manual antes de guardar
+
+#### Scenario: Guardado de nuevos términos
+- **WHEN** el personal guarda una selección que cambia la tarifa de una cotización confirmada
+- **THEN** se guarda la tarifa mostrada conforme a validaciones y versión vigentes y se requiere la reconfirmación comercial existente

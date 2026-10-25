@@ -1,6 +1,6 @@
 "use server";
 import { requireStaff } from "@lm/data/server";
-import { contactSchema, requestEditSchema } from "@lm/validation";
+import { fullContactSchema, operationalEditSchema } from "@lm/validation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { FormResult } from "@/components/record-ui";
@@ -65,14 +65,13 @@ export async function saveNote(_previous: FormResult, form: FormData): Promise<F
 }
 export async function editCustomer(_previous: FormResult, form: FormData): Promise<FormResult> {
   const id = identity.safeParse(Object.fromEntries(form));
-  const contact = contactSchema.safeParse(Object.fromEntries(form));
+  const contact = fullContactSchema.safeParse(Object.fromEntries(form));
   if (!id.success || !contact.success) return { error: "INVALID_INPUT", success: false };
   const { db } = await requireStaff("requests.edit");
-  const { error } = await db.rpc("edit_customer", {
+  const { error } = await db.rpc("edit_customer_name", {
     p_id: id.data.id,
     p_version: id.data.version,
-    p_first: contact.data.first_name,
-    p_last: contact.data.last_name,
+    p_name: contact.data.full_name,
     p_phone: contact.data.phone,
     p_email: contact.data.email ?? "",
   });
@@ -91,22 +90,25 @@ export async function editRequest(_previous: FormResult, form: FormData): Promis
     postal_code: text(`${key}.postal_code`),
     country: "US",
   });
-  const parsed = requestEditSchema.safeParse({
-    first_name: text("first_name"),
-    last_name: text("last_name"),
+  const parsed = operationalEditSchema.safeParse({
+    full_name: text("full_name"),
+    origin_county: text("origin_county"),
+    destination_county: text("destination_county"),
+    territorial_reviewed: text("territorial_reviewed") === "on",
     phone: text("phone"),
     email: text("email"),
     origin: address("origin"),
     destination: address("destination"),
     moving_date: text("moving_date") || null,
-    property_type: text("property_type"),
+    property_type: text("property_type") || null,
     bedrooms: ["HOUSE", "APARTMENT"].includes(text("property_type")) ? optionalNumber("bedrooms") : null,
     property_size: optionalNumber("property_size"),
     size_unit: text("property_size") ? text("size_unit") : null,
-    origin_floor: Number(text("origin_floor")),
-    destination_floor: Number(text("destination_floor")),
-    origin_elevator: text("origin_elevator") === "on",
-    destination_elevator: text("destination_elevator") === "on",
+    origin_floor: optionalNumber("origin_floor"),
+    destination_floor: optionalNumber("destination_floor"),
+    origin_elevator: text("origin_elevator") === "" ? null : text("origin_elevator") === "true",
+    destination_elevator:
+      text("destination_elevator") === "" ? null : text("destination_elevator") === "true",
     workers: optionalNumber("workers"),
     comments: text("comments"),
   });

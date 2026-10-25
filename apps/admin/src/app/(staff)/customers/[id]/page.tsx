@@ -11,7 +11,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     db
       .from("moving_requests")
       .select(
-        "id,request_number,first_name,last_name,phone,moving_date,status,created_at,origin:addresses!moving_requests_origin_id_fkey(street,city),destination:addresses!moving_requests_destination_id_fkey(street,city)",
+        "id,request_number,full_name,first_name,last_name,phone,moving_date,status,created_at,origin:addresses!moving_requests_origin_id_fkey(street,city,input,postal_code),destination:addresses!moving_requests_destination_id_fkey(street,city,input,postal_code)",
       )
       .eq("customer_id", id)
       .order("created_at", { ascending: false }),

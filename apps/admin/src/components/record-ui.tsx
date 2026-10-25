@@ -51,6 +51,10 @@ export const initialResult: FormResult = { error: "", success: false };
 export function ResultNotice({ result }: { result: FormResult }) {
   const { t } = useLanguage();
   const messages: Record<string, [string, string]> = {
+    ROUTE_REVIEW_REQUIRED: [
+      "Completa ambas direcciones y verifica los condados para confirmar, programar o aprobar por millas. La aprobación interna local permite direcciones pendientes.",
+      "Complete both addresses and verify counties to confirm, schedule or approve mileage pricing. Local internal approval allows pending addresses.",
+    ],
     CONFLICT: [
       "Otra persona cambió este registro. Recarga la página y revisa sus cambios antes de guardar.",
       "Someone changed this record. Reload the page and review their changes before saving.",
