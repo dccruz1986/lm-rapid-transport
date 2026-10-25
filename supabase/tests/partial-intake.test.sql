@@ -1,0 +1,33 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select no_plan();
+insert into auth.users(id,email) values('97000000-0000-0000-0000-000000000001','partial-intake@example.test');
+update public.profiles set active=true,role='DISPATCHER' where id='97000000-0000-0000-0000-000000000001';
+select public.intake_begin('97000000-0000-0000-0000-000000000002',repeat('c',64),'{"version":2,"full_name":"Fixture Compound Name","phone":"+13055550177","email":null,"origin":{"input":"33147","postal_code":"33147","precision":"MANUAL"},"destination":{"input":"33016","postal_code":"33016","precision":"MANUAL"},"move_size":"BEDROOMS_5_PLUS","property_type":"HOUSE","bedrooms":null,"moving_date":null,"comments":"Synthetic transaction fixture"}');
+select lives_ok($$select public.intake_finalize(repeat('c',64))$$,'Partial intake commits without fake data');
+select set_config('test.partial',(select request_id::text from private.intake_sessions where token_hash=repeat('c',64)),true);
+select is((select full_name from public.moving_requests where id=current_setting('test.partial')::uuid),'Fixture Compound Name','Name remains whole');
+select ok((select origin_elevator is null and origin_floor is null and first_name is null and bedrooms is null from public.moving_requests where id=current_setting('test.partial')::uuid),'Unknown details remain null');
+select ok((select street is null and city is null from public.addresses where id=(select origin_id from public.moving_requests where id=current_setting('test.partial')::uuid)),'ZIP never becomes street');
+select is(public.intake_finalize(repeat('c',64)),(select request_number from public.moving_requests where id=current_setting('test.partial')::uuid),'Finalize is idempotent');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','97000000-0000-0000-0000-000000000001',true);
+select lives_ok($$select public.save_quote(current_setting('test.partial')::uuid,0,'LOCAL',2,11900,3)$$,'Draft allowed');
+select lives_ok($$select public.approve_quote(current_setting('test.partial')::uuid,1)$$,'Local internal approval allows partial addresses');
+select throws_ok($$select public.communicate_quote(current_setting('test.partial')::uuid,2,'PHONE',now(),'Synthetic acceptance',true)$$,'P0001','ROUTE_REVIEW_REQUIRED','Confirmation still requires addresses');
+select is((select count(*) from public.quote_communications where quote_id=(select id from public.quotes where request_id=current_setting('test.partial')::uuid)),0::bigint,'Failed confirmation does not insert a communication');
+select lives_ok($$select public.communicate_quote(current_setting('test.partial')::uuid,2,'PHONE',now(),'Customer contacted; addresses pending',false)$$,'Approved local quote accepts communication without full addresses');
+select is((select status from public.quotes where request_id=current_setting('test.partial')::uuid),'ACCEPTED','Communication alone does not confirm quote');
+reset role;
+update public.quotes set status='ESTIMATED',version=1 where request_id=current_setting('test.partial')::uuid;
+set local role authenticated;
+select lives_ok($$select public.edit_request(current_setting('test.partial')::uuid,(select version from public.moving_requests where id=current_setting('test.partial')::uuid),'{"full_name":"Fixture Compound Name","phone":"+13055550177","origin":{"street":"123 Fixture Street","unit":"","city":"Hialeah","state":"FL","country":"US","postal_code":"33016"},"destination":{"street":"456 Fixture Street","unit":"","city":"Miami Beach","state":"FL","country":"US","postal_code":"33139"},"origin_county":"MIAMI_DADE","destination_county":"MIAMI_DADE","territorial_reviewed":true,"property_type":"HOUSE","bedrooms":null,"comments":"Synthetic transaction fixture"}')$$,'Staff completes full addresses and county review');
+select is((select suggested_mode from public.moving_requests where id=current_setting('test.partial')::uuid),'LOCAL','Hialeah to Miami Beach is hourly');
+select lives_ok($$select public.approve_quote(current_setting('test.partial')::uuid,1)$$,'Reviewed route can be approved');
+select throws_ok($$select public.edit_request(current_setting('test.partial')::uuid,(select version from public.moving_requests where id=current_setting('test.partial')::uuid),'{"full_name":"Fixture Compound Name","phone":"+13055550177","origin_county":"OTHER_FL","destination_county":"MIAMI_DADE","territorial_reviewed":true}')$$,'P0001','REVIEW_QUOTE_FIRST','Accepted route cannot change silently');
+reset role;
+select ok(not has_function_privilege('anon','public.edit_customer_name(uuid,integer,text,text,text)','EXECUTE'),'Anonymous cannot edit customer');
+select * from finish();
+rollback;
+
+

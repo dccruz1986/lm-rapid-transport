@@ -1,8 +1,9 @@
 import "server-only";
 import { createHash, createHmac } from "node:crypto";
 import { appUrl } from "@lm/config/env";
-import { FILE_LIMIT, intakeStartSchema } from "@lm/validation";
+import { FILE_LIMIT, publicIntakeSchema } from "@lm/validation";
 import sharp from "sharp";
+import { prepareIntakeV2 } from "./locations";
 import { privilegedClient } from "./privileged";
 
 export class IntakeError extends Error {
@@ -21,7 +22,7 @@ function secret() {
   if (!value || value.length < 32) throw new IntakeError("UNAVAILABLE", 503);
   return value;
 }
-export async function intakeGuard(request: Request, purpose: "begin" | "upload" | "finish") {
+export async function intakeGuard(request: Request, purpose: "begin" | "upload" | "finish" | "location") {
   if (request.headers.get("origin") !== new URL(appUrl("web")).origin) throw new IntakeError("ORIGIN", 403);
   const db = privilegedClient();
   const limits: Array<[string, number]> = [[`global:${purpose}`, purpose === "begin" ? 300 : 2400]];
@@ -88,7 +89,7 @@ export async function beginIntake(request: Request) {
     if (error instanceof IntakeError) throw error;
     throw new IntakeError("INVALID_INPUT");
   }
-  const parsed = intakeStartSchema.safeParse(body);
+  const parsed = publicIntakeSchema.safeParse(body);
   if (!parsed.success)
     return Response.json(
       { error: "INVALID_INPUT", fields: parsed.error.issues.map((issue) => issue.path.join(".")) },
@@ -98,7 +99,10 @@ export async function beginIntake(request: Request) {
   const { error } = await privilegedClient().rpc("intake_begin", {
     p_key: parsed.data.key,
     p_hash: hash(token),
-    p_data: parsed.data.data,
+    p_data:
+      "version" in parsed.data.data
+        ? { ...prepareIntakeV2(parsed.data.data), client_fingerprint: hash(JSON.stringify(parsed.data.data)) }
+        : parsed.data.data,
   });
   fail(error);
   return Response.json({ token }, { headers: { "Cache-Control": "no-store" } });

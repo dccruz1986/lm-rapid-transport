@@ -1,14 +1,21 @@
 "use client";
 import { moveStatuses } from "@lm/types";
 import { Button, EmptyState, useLanguage } from "@lm/ui";
+import { displayName } from "@lm/validation";
 import { DateText, PageHeading, Pagination, StatusBadge, statusLabels } from "./record-ui";
 export type MoveListRow = {
   id: string;
   status: string;
   scheduled_at: string;
-  request: { request_number: string; first_name: string; last_name: string; phone: string };
-  origin: { city: string };
-  destination: { city: string };
+  request: {
+    request_number: string;
+    full_name?: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    phone: string;
+  };
+  origin: { city: string | null };
+  destination: { city: string | null };
 };
 export function MoveList({
   rows,
@@ -71,7 +78,7 @@ export function MoveList({
                     </a>
                   </td>
                   <td>
-                    {m.request.first_name} {m.request.last_name}
+                    {displayName(m.request)}
                     <small className="cell-secondary">{m.request.phone}</small>
                   </td>
                   <td>

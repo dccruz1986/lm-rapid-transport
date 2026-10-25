@@ -94,7 +94,7 @@ también en Seenode; el upload a Storage debe tener un timeout menor a ese lími
 
 ## Operación del MVP
 
-Desde Solicitudes, revisar contacto, dirección y clasificación municipal. Preparar
+Desde Solicitudes, revisar contacto, dirección y clasificación por condado (Miami-Dade por hora; fuera del condado por millas). Preparar
 la cotización LOCAL (horas del equipo) o PER_MILE (millas de ida), aprobarla y
 registrar la comunicación manual. Marcar aceptación solo cuando el cliente haya
 aceptado esas condiciones. El sistema no envía cotizaciones por email/WhatsApp.
@@ -181,4 +181,7 @@ Guardar el commit y configuración de cada release. Ante fallo, volver al artefa
 anterior compatible con el esquema; no borrar solicitudes para revertir. Para SQL,
 usar una migración correctiva después del respaldo; no asumir que el rollback de
 la aplicación revierte la base. Pausar recepción si no puede garantizarse consistencia.
+
+
+Formulario de tres pasos y configuración de Google: [docs/google-locations.md](docs/google-locations.md).
 

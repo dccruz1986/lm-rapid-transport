@@ -15,7 +15,9 @@ export default async function Page({
     .order("created_at", { ascending: false })
     .range((page - 1) * 20, page * 20 - 1);
   if (q)
-    query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`);
+    query = query.or(
+      `full_name.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`,
+    );
   const { data, error, count } = await query;
   if (error) throw error;
   return <CustomerList rows={data} total={count ?? 0} page={page} q={q} />;

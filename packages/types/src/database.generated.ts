@@ -25,14 +25,14 @@ export type Database = {
           Tables: {
             "addresses": {
                   Row: {
-                    "city": string,"country": string,"created_at": string,"id": string,"postal_code": string,"state": string,"street": string,"unit": string,"updated_at": string
+                    "city": string | null,"country": string | null,"county": string | null,"created_at": string,"id": string,"input": string | null,"place_id": string | null,"postal_code": string | null,"precision": string,"state": string | null,"street": string | null,"unit": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "city": string,"country"?: string,"created_at"?: string,"id"?: string,"postal_code": string,"state"?: string,"street": string,"unit"?: string,"updated_at"?: string
+                    "city"?: string | null,"country"?: string | null,"county"?: string | null,"created_at"?: string,"id"?: string,"input"?: string | null,"place_id"?: string | null,"postal_code"?: string | null,"precision"?: string,"state"?: string | null,"street"?: string | null,"unit"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "city"?: string,"country"?: string,"created_at"?: string,"id"?: string,"postal_code"?: string,"state"?: string,"street"?: string,"unit"?: string,"updated_at"?: string
+                    "city"?: string | null,"country"?: string | null,"county"?: string | null,"created_at"?: string,"id"?: string,"input"?: string | null,"place_id"?: string | null,"postal_code"?: string | null,"precision"?: string,"state"?: string | null,"street"?: string | null,"unit"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     
@@ -59,14 +59,14 @@ isOneToOne: false
                   ]
                 },"customers": {
                   Row: {
-                    "created_at": string,"email": string | null,"first_name": string,"id": string,"last_name": string,"phone": string,"updated_at": string,"version": number
+                    "created_at": string,"email": string | null,"first_name": string | null,"full_name": string | null,"id": string,"last_name": string | null,"phone": string,"updated_at": string,"version": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"email"?: string | null,"first_name": string,"id"?: string,"last_name": string,"phone": string,"updated_at"?: string,"version"?: number
+                    "created_at"?: string,"email"?: string | null,"first_name"?: string | null,"full_name"?: string | null,"id"?: string,"last_name"?: string | null,"phone": string,"updated_at"?: string,"version"?: number
                   }
                   Update: {
-                    "created_at"?: string,"email"?: string | null,"first_name"?: string,"id"?: string,"last_name"?: string,"phone"?: string,"updated_at"?: string,"version"?: number
+                    "created_at"?: string,"email"?: string | null,"first_name"?: string | null,"full_name"?: string | null,"id"?: string,"last_name"?: string | null,"phone"?: string,"updated_at"?: string,"version"?: number
                   }
                   Relationships: [
                     
@@ -111,14 +111,14 @@ isOneToOne: true
                   ]
                 },"moving_requests": {
                   Row: {
-                    "bedrooms": number | null,"cancellation_reason": string | null,"cancelled_at": string | null,"comments": string,"created_at": string,"customer_id": string,"destination_elevator": boolean,"destination_floor": number,"destination_id": string,"email": string | null,"first_name": string,"id": string,"last_name": string,"moving_date": string | null,"origin_elevator": boolean,"origin_floor": number,"origin_id": string,"phone": string,"property_size": number | null,"property_type": string,"request_number": string,"size_unit": string | null,"status": string,"updated_at": string,"version": number,"workers": number | null
+                    "bedrooms": number | null,"cancellation_reason": string | null,"cancelled_at": string | null,"comments": string,"created_at": string,"customer_id": string,"destination_elevator": boolean | null,"destination_floor": number | null,"destination_id": string,"email": string | null,"first_name": string | null,"full_name": string | null,"id": string,"intake_version": number,"last_name": string | null,"move_size": string | null,"moving_date": string | null,"origin_elevator": boolean | null,"origin_floor": number | null,"origin_id": string,"phone": string,"property_size": number | null,"property_type": string | null,"request_number": string,"size_unit": string | null,"status": string,"suggested_mode": string | null,"territorial_reviewed": boolean,"territorial_source": string,"updated_at": string,"version": number,"workers": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "bedrooms"?: number | null,"cancellation_reason"?: string | null,"cancelled_at"?: string | null,"comments"?: string,"created_at"?: string,"customer_id": string,"destination_elevator": boolean,"destination_floor": number,"destination_id": string,"email"?: string | null,"first_name": string,"id"?: string,"last_name": string,"moving_date"?: string | null,"origin_elevator": boolean,"origin_floor": number,"origin_id": string,"phone": string,"property_size"?: number | null,"property_type": string,"request_number"?: string,"size_unit"?: string | null,"status"?: string,"updated_at"?: string,"version"?: number,"workers"?: number | null
+                    "bedrooms"?: number | null,"cancellation_reason"?: string | null,"cancelled_at"?: string | null,"comments"?: string,"created_at"?: string,"customer_id": string,"destination_elevator"?: boolean | null,"destination_floor"?: number | null,"destination_id": string,"email"?: string | null,"first_name"?: string | null,"full_name"?: string | null,"id"?: string,"intake_version"?: number,"last_name"?: string | null,"move_size"?: string | null,"moving_date"?: string | null,"origin_elevator"?: boolean | null,"origin_floor"?: number | null,"origin_id": string,"phone": string,"property_size"?: number | null,"property_type"?: string | null,"request_number"?: string,"size_unit"?: string | null,"status"?: string,"suggested_mode"?: string | null,"territorial_reviewed"?: boolean,"territorial_source"?: string,"updated_at"?: string,"version"?: number,"workers"?: number | null
                   }
                   Update: {
-                    "bedrooms"?: number | null,"cancellation_reason"?: string | null,"cancelled_at"?: string | null,"comments"?: string,"created_at"?: string,"customer_id"?: string,"destination_elevator"?: boolean,"destination_floor"?: number,"destination_id"?: string,"email"?: string | null,"first_name"?: string,"id"?: string,"last_name"?: string,"moving_date"?: string | null,"origin_elevator"?: boolean,"origin_floor"?: number,"origin_id"?: string,"phone"?: string,"property_size"?: number | null,"property_type"?: string,"request_number"?: string,"size_unit"?: string | null,"status"?: string,"updated_at"?: string,"version"?: number,"workers"?: number | null
+                    "bedrooms"?: number | null,"cancellation_reason"?: string | null,"cancelled_at"?: string | null,"comments"?: string,"created_at"?: string,"customer_id"?: string,"destination_elevator"?: boolean | null,"destination_floor"?: number | null,"destination_id"?: string,"email"?: string | null,"first_name"?: string | null,"full_name"?: string | null,"id"?: string,"intake_version"?: number,"last_name"?: string | null,"move_size"?: string | null,"moving_date"?: string | null,"origin_elevator"?: boolean | null,"origin_floor"?: number | null,"origin_id"?: string,"phone"?: string,"property_size"?: number | null,"property_type"?: string | null,"request_number"?: string,"size_unit"?: string | null,"status"?: string,"suggested_mode"?: string | null,"territorial_reviewed"?: boolean,"territorial_source"?: string,"updated_at"?: string,"version"?: number,"workers"?: number | null
                   }
                   Relationships: [
                     {
@@ -287,6 +287,9 @@ isOneToOne: true
                            },
 "edit_customer":
 { Args: { "p_email": string,"p_first": string,"p_id": string,"p_last": string,"p_phone": string,"p_version": number }; Returns: undefined
+                           },
+"edit_customer_name":
+{ Args: { "p_email": string,"p_id": string,"p_name": string,"p_phone": string,"p_version": number }; Returns: undefined
                            },
 "edit_request":
 { Args: { "p_data": Json,"p_id": string,"p_version": number }; Returns: undefined
