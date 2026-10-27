@@ -1,0 +1,40 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select no_plan();
+insert into auth.users(id,email) values
+('98000000-0000-0000-0000-000000000001','email-admin@example.test'),
+('98000000-0000-0000-0000-000000000002','email-manager@example.test'),
+('98000000-0000-0000-0000-000000000003','email-dispatch@example.test');
+update public.profiles set active=true,role='ADMIN' where id='98000000-0000-0000-0000-000000000001';
+update public.profiles set active=true,role='MANAGER' where id='98000000-0000-0000-0000-000000000002';
+update public.profiles set active=true,role='DISPATCHER' where id='98000000-0000-0000-0000-000000000003';
+select ok(not has_function_privilege('anon','public.begin_staff_email(text,text)','EXECUTE'),'Anonymous cannot send');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','98000000-0000-0000-0000-000000000003',true);
+select throws_ok($$select public.begin_staff_email('mail-pending@example.test','DISPATCHER')$$,'42501',null,'Dispatcher cannot send');
+select set_config('request.jwt.claim.sub','98000000-0000-0000-0000-000000000002',true);
+select throws_ok($$select public.begin_staff_email('mail-pending@example.test','ADMIN')$$,'42501',null,'Manager cannot invite admin');
+select lives_ok($$select public.begin_staff_email('mail-pending@example.test','DISPATCHER')$$,'Manager can begin invitation');
+select throws_ok($$select public.begin_staff_email('MAIL-PENDING@example.test','DISPATCHER')$$,'P0001','INVITE_RATE_LIMITED','Duplicate concurrent attempt blocked case-insensitively');
+reset role;
+insert into auth.users(id,email,invited_at) values('98000000-0000-0000-0000-000000000004','mail-pending@example.test',now());
+update private.staff_email_attempts set last_at=now()-interval '2 minutes' where email='mail-pending@example.test';
+set local role authenticated;
+select is(public.begin_staff_email('mail-pending@example.test','DISPATCHER')->>'pending_id','98000000-0000-0000-0000-000000000004','Failed email can retry same pending user');
+reset role;
+update private.staff_email_attempts set last_at=now()-interval '2 minutes' where email='mail-pending@example.test';
+set local role authenticated;
+select throws_ok($$select public.begin_staff_email('mail-pending@example.test','MANAGER')$$,'P0001','USER_EXISTS','Retry cannot alter role');
+reset role;
+update private.staff_email_attempts set attempts=5 where email='mail-pending@example.test';
+set local role authenticated;
+select throws_ok($$select public.begin_staff_email('mail-pending@example.test','DISPATCHER')$$,'P0001','INVITE_RATE_LIMITED','Hourly limit enforced');
+reset role;
+update private.staff_email_attempts set window_at=now()-interval '2 hours',last_at=now()-interval '2 hours' where email='mail-pending@example.test';
+update auth.users set last_sign_in_at=now() where id='98000000-0000-0000-0000-000000000004';
+set local role authenticated;
+select throws_ok($$select public.begin_staff_email('mail-pending@example.test','DISPATCHER')$$,'P0001','USER_EXISTS','Activated user cannot be reinvited');
+select set_config('request.jwt.claim.sub','98000000-0000-0000-0000-000000000001',true);
+select lives_ok($$select public.begin_staff_email('another-admin@example.test','ADMIN')$$,'Admin can invite admin');
+select * from finish();
+rollback;

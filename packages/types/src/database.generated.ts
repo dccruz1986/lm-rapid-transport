@@ -273,6 +273,7 @@ isOneToOne: true
             [_ in never]: never
           }
           Functions: {
+            "begin_staff_email": { Args: { p_email: string; p_role: string }; Returns: Json },
             "approve_quote":
 { Args: { "p_request": string,"p_version": number }; Returns: undefined
                            },
