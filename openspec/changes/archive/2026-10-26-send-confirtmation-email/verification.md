@@ -18,3 +18,9 @@ Después de reparar/reiniciar Docker: servir resend y comprobar que peticiones s
 Runtime local operativo. Comprobación HTTP real con cuerpo vacío (sin envío): sin apikey devuelve 401; publishable devuelve 401; secret default devuelve 400 INVALID_INPUT del handler. Se completa la prueba pendiente de acceso de 3.2. La configuración requerida está presente en runtime. El 502 transitorio desapareció tras la recarga del proxy/runtime.
 
 Se corrigió una regresión posterior en index.ts: Response.json(sendInvitation(...)) serializaba el objeto Response y ocultaba su estado/cuerpo; ahora se devuelve directamente. Se restauró auth: secret y se retiró el log de la clave en la acción admin. No se efectuó entrega real a un destinatario.
+
+## Diagnóstico de Resend y cierre 2026-10-26
+
+El remitente local configurado usa gmail.com y la consulta de dominios de Resend devolvió una lista vacía. La API key respondió a las comprobaciones; no se envió un correo real. Se añadieron errores controlados para dominio no verificado, destinatario restringido al modo de prueba y API key rechazada, con mensajes en el admin sin exponer detalles privados del proveedor.
+
+Validación posterior: 6 pruebas unitarias correctas, 31 aserciones, y comprobación de tipos del admin correcta. El cierre del cambio cubre implementación y pruebas simuladas/locales. La entrega real permanece pendiente de configurar un remitente autorizado y probar con un destinatario controlado.
