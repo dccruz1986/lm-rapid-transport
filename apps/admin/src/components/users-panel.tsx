@@ -33,19 +33,45 @@ export function UsersPanel({
             </select>
           </label>
           <div className="full">
-            <Button disabled={pending}>{t("Enviar invitación", "Send invitation")}</Button>
+            <Button disabled={pending}>
+              {t("Enviar o reenviar invitación", "Send or resend invitation")}
+            </Button>
           </div>
           {state.error && (
             <p className="notice error full" role="alert">
-              {t(
-                "No se pudo invitar. Revisa si la cuenta ya existe, tus permisos y la configuración de correo.",
-                "Unable to invite. Check whether the account exists, your permissions and email configuration.",
-              )}
+              {state.error === "INVITE_RATE_LIMITED" || state.error === "MAIL_RATE_LIMITED"
+                ? t(
+                    "Límite de envíos. Espera al menos un minuto; máximo cinco intentos por hora.",
+                    "Sending limit reached. Wait at least a minute; maximum five attempts per hour.",
+                  )
+                : state.error === "MAIL_CONFIGURATION"
+                  ? t(
+                      "Falta configurar el servicio de correo. La cuenta puede quedar pendiente de invitación.",
+                      "Email service configuration is missing. The account may remain pending invitation.",
+                    )
+                    : state.error === "MAIL_DOMAIN_UNVERIFIED"
+                      ? t("El dominio del remitente no está verificado en Resend. Configura RESEND_FROM_EMAIL con un dominio propio verificado; no puede ser gmail.com.", "The sender domain is not verified in Resend. Set RESEND_FROM_EMAIL to an address on your verified domain; it cannot be gmail.com.")
+                    : state.error === "MAIL_TEST_RECIPIENT_ONLY"
+                      ? t("El remitente de prueba de Resend solo permite enviar a tu correo de registro en Resend. Verifica un dominio propio para invitar a otros usuarios.", "Resend's test sender only allows your Resend account email. Verify your own domain to invite other users.")
+                    : state.error === "MAIL_API_KEY_INVALID"
+                      ? t("Resend rechazó la API key. Revisa RESEND_API_KEY en la función de correo.", "Resend rejected the API key. Check RESEND_API_KEY in the email function.")
+                    : state.error === "USER_EXISTS" || state.error === "FORBIDDEN"
+                    ? t(
+                        "La cuenta ya tiene acceso, el rol no coincide o no tienes permiso para invitarla.",
+                        "The account already has access, the role differs, or you lack permission to invite it.",
+                      )
+                    : t(
+                        "No se pudo confirmar el envío. Si la cuenta fue creada, queda pendiente: reintenta con el mismo correo y rol después de un minuto.",
+                        "Sending could not be confirmed. If the account was created, it remains pending: retry with the same email and role after a minute.",
+                      )}
             </p>
           )}
           {state.success && (
             <p className="notice full" role="status">
-              {t("Invitación enviada.", "Invitation sent.")}
+              {t(
+                "El proveedor aceptó el envío. El usuario debe abrir el enlace y establecer su contraseña; esto aún no confirma la entrega ni la activación.",
+                "The provider accepted the email. The user must open the link and set a password; delivery and activation are not yet confirmed.",
+              )}
             </p>
           )}
         </form>
