@@ -2,6 +2,7 @@
 import { Button, LanguageSwitch, useLanguage } from "@lm/ui";
 import { Inbox, LayoutDashboard, LogOut, Shield, SlidersHorizontal, Truck, Users } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/auth/actions";
 export function AdminShell({
@@ -31,8 +32,11 @@ export function AdminShell({
   ];
   return (
     <div className="admin-shell">
+      <a className="skip-link" href="#admin-content">
+        {t("Saltar al contenido", "Skip to content")}
+      </a>
       <aside className="sidebar">
-        <a className="brand" href="/dashboard">
+        <Link className="brand" href="/dashboard">
           <Image
             className="brand-logo"
             src="/logo.png"
@@ -44,20 +48,25 @@ export function AdminShell({
           <span>
             Rapid Transport<small>{t("Operaciones", "Operations")}</small>
           </span>
-        </a>
+        </Link>
         <nav aria-label={t("Navegación principal", "Main navigation")}>
           {links.map(({ url, es, en, Icon }) => (
-            <a key={url} href={url} className={path.startsWith(url) ? "active" : ""}>
-              <Icon size={18} />
+            <Link
+              key={url}
+              href={url}
+              className={path.startsWith(url) ? "active" : ""}
+              aria-current={path.startsWith(url) ? "page" : undefined}
+            >
+              <Icon size={18} aria-hidden="true" />
               {t(es, en)}
-            </a>
+            </Link>
           ))}
         </nav>
         <div className="sidebar-bottom small" style={{ marginTop: "auto" }}>
           {t("Cada mudanza, un nuevo comienzo.", "Every move, a new beginning.")}
         </div>
       </aside>
-      <main className="admin-main">
+      <main className="admin-main" id="admin-content" tabIndex={-1}>
         <header className="admin-top">
           <div>
             <strong>{t("Panel de operaciones", "Operations dashboard")}</strong>

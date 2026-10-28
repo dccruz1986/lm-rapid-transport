@@ -48,6 +48,11 @@ export function RequestDetail({
           <p className="muted">
             {t("Recibida", "Received")} <DateText value={request.created_at} time />
           </p>
+          {children && (
+            <a className="button button-outline" href="#request-workflow">
+              {t("Ir a cotización y programación", "Go to quote and scheduling")}
+            </a>
+          )}
         </div>
         {request.intake_version === 2 && (
           <section className="notice">

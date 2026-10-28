@@ -454,6 +454,38 @@ export function Workflow(props: Props) {
   const { t } = useLanguage();
   const editable =
     request.status !== "CANCELLED" && (move?.status !== "COMPLETED" || permissions.includes("moves.correct"));
+  const stage =
+    request.status === "CANCELLED" || move?.status === "COMPLETED"
+      ? null
+      : quote?.status === "CONFIRMED"
+        ? 3
+        : quote?.status === "ACCEPTED"
+          ? 2
+          : !props.routeReady && !quote
+            ? 0
+            : 1;
+  const stages = [
+    {
+      id: "request-information",
+      es: "Datos y direcciones",
+      en: "Details and addresses",
+      permission: "requests.edit",
+    },
+    { id: "request-quote", es: "Cotización", en: "Quote", permission: "quotes.edit" },
+    {
+      id: "request-acceptance",
+      es: "Comunicación y aceptación",
+      en: "Communication and acceptance",
+      permission: "quotes.confirm",
+    },
+    {
+      id: "request-schedule",
+      es: "Programación y mudanza",
+      en: "Scheduling and move",
+      permission: move?.status === "IN_PROGRESS" ? "moves.operate" : "moves.schedule",
+    },
+  ];
+  const currentStage = stage === null ? undefined : stages[stage];
   const fields: Record<string, [string, string]> = {
     rate_cents: ["Tarifa (centavos USD)", "Rate (USD cents)"],
     estimated_quantity: ["Cantidad estimada", "Estimated quantity"],
@@ -464,7 +496,34 @@ export function Workflow(props: Props) {
   };
   return (
     <>
-      <section className="card stack" id="request-information">
+      <nav id="request-workflow" aria-label={t("Etapas de la solicitud", "Request stages")}>
+        <ol className="workflow-nav">
+          {stages.map((item, index) => (
+            <li key={item.id}>
+              <a href={`#${item.id}`} aria-current={stage === index ? "step" : undefined}>
+                {index + 1}. {t(item.es, item.en)}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+      {currentStage && (
+        <p className="notice workflow-next">
+          <strong>
+            {t("Siguiente etapa", "Next stage")}: {t(currentStage.es, currentStage.en)}.
+          </strong>{" "}
+          {!permissions.includes(currentStage.permission)
+            ? t(
+                "Tu rol permite consultar esta etapa; el cambio requiere personal autorizado.",
+                "You can review this stage; changes require authorized staff.",
+              )
+            : t(
+                "Revisa los requisitos del formulario antes de continuar.",
+                "Review the form requirements before continuing.",
+              )}
+        </p>
+      )}
+      <section className="card stack workflow-section" data-current={stage === 0} id="request-information">
         <h2>{t("1. Revisar datos y direcciones", "1. Review details and addresses")}</h2>
         <p className="muted">
           {t(
@@ -487,7 +546,7 @@ export function Workflow(props: Props) {
           <RequestEditor key={request.id} request={request} />
         )}
       </section>
-      <section className="card stack">
+      <section className="card stack workflow-section" data-current={stage === 1} id="request-quote">
         <h2>{t("2. Guardar y aprobar la cotización", "2. Save and approve the quote")}</h2>
         <p className="muted">
           {t(
@@ -529,7 +588,7 @@ export function Workflow(props: Props) {
           <QuoteApproval request={request.id} quote={quote} permissions={permissions} />
         )}
       </section>
-      <section className="card stack">
+      <section className="card stack workflow-section" data-current={stage === 2} id="request-acceptance">
         <h2>{t("3. Comunicar y registrar la aceptación", "3. Communicate and record acceptance")}</h2>
         <p className="muted">
           {t(
@@ -578,7 +637,7 @@ export function Workflow(props: Props) {
           ))}
         </details>
       </section>
-      <section className="card stack">
+      <section className="card stack workflow-section" data-current={stage === 3} id="request-schedule">
         <h2>{t("4. Programar y gestionar la mudanza", "4. Schedule and manage the move")}</h2>
         {move ? (
           <>

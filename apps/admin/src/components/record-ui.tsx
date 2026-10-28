@@ -40,7 +40,6 @@ export function PageHeading({ es, en, subtitle }: { es: string; en: string; subt
   const { t } = useLanguage();
   return (
     <div className="page-heading">
-      <span className="eyebrow">LM RAPID TRANSPORT</span>
       <h1>{t(es, en)}</h1>
       {subtitle && <p className="muted">{t(...subtitle)}</p>}
     </div>
@@ -90,7 +89,7 @@ export function ResultNotice({ result }: { result: FormResult }) {
     );
   if (result.success)
     return (
-      <p className="notice" role="status">
+      <p className="notice success" role="status">
         {t("Cambios guardados.", "Changes saved.")}
       </p>
     );

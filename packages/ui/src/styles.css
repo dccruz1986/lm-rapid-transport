@@ -5,10 +5,21 @@
   --background: #ffffff;
   --foreground: #281b16;
   --primary: #a43b15;
-  --muted: #71635c;
-  --border: #eaded7;
-  --radius: 0.8rem;
+  --muted: #665950;
+  --border: #ded6d1;
+  --radius: 12px;
   --accent: #d75523;
+  --font-body: "Segoe UI", Arial, Helvetica, sans-serif;
+  --font-display: "Segoe UI", Arial, Helvetica, sans-serif;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --control-border: #8d7e75;
 }
 * {
   box-sizing: border-box;
@@ -17,8 +28,8 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 15px;
+  font-family: var(--font-body);
+  font-size: 16px;
   line-height: 1.55;
 }
 a {
@@ -46,7 +57,7 @@ button {
   cursor: pointer;
 }
 button:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.6;
 }
 .button {
@@ -54,7 +65,7 @@ button:disabled {
   gap: 10px;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 12px 20px;
   font-size: 14px;
   font-weight: 700;
@@ -62,8 +73,8 @@ button:disabled {
   min-height: 44px;
 }
 .button-primary {
-  background: var(--accent);
-  color: var(--foreground);
+  background: var(--primary);
+  color: white;
 }
 .button-outline {
   background: white;
@@ -78,7 +89,7 @@ button:disabled {
 }
 .button-sm {
   padding: 7px 12px;
-  min-height: 36px;
+  min-height: 44px;
 }
 .container {
   max-width: 1160px;
@@ -347,7 +358,7 @@ h3 {
 .input {
   padding: 11px 12px;
   background: #fff;
-  border: 1px solid #decfc5;
+  border: 1px solid var(--control-border);
   border-radius: 7px;
   width: 100%;
   font-weight: 400;
@@ -1128,7 +1139,7 @@ details > summary {
   margin-top: 8px;
 }
 .location-field > input {
-  border: 1px solid var(--border);
+  border: 1px solid var(--control-border);
   border-radius: 10px;
   background: white;
   padding: 16px 18px;
@@ -1168,4 +1179,726 @@ details > summary {
 .move-results-total dd {
   color: var(--primary);
   font-size: 1.8rem;
+}
+
+/* Shared interaction foundations. Application roots keep layout rules isolated. */
+.button:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+.button-outline {
+  border-color: var(--control-border);
+}
+.button-ghost:hover:not(:disabled) {
+  background: #f4f2f0;
+}
+:is(.public-app, .admin-app) :is(input, select, textarea) {
+  scroll-margin-block: 100px;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+input[aria-invalid="true"],
+select[aria-invalid="true"] {
+  border-color: #a12929;
+}
+.public-app .field,
+.admin-app .field {
+  font-size: 14px;
+}
+.field input,
+.field select,
+.field textarea {
+  font-size: 16px;
+}
+.language-switch button {
+  min-width: 40px;
+  min-height: 38px;
+  font-size: 12px;
+}
+.language-switch button[aria-pressed="true"] {
+  background: var(--primary);
+  color: white;
+}
+.brand small {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 400;
+}
+.small {
+  font-size: 13px;
+}
+.eyebrow {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+}
+.notice {
+  border-left: 3px solid var(--primary);
+  background: #fff8f4;
+  line-height: 1.6;
+}
+.notice.error {
+  border-left-color: #a12929;
+}
+.notice.success {
+  background: #eff7f1;
+  color: #245945;
+  border-color: #99b9a5;
+}
+.check-field {
+  align-items: flex-start;
+  padding-block: 8px;
+}
+.check-field input {
+  flex: 0 0 20px;
+  margin-top: 3px;
+}
+.location-field > input {
+  border-radius: 6px;
+}
+.location-field > input:focus {
+  outline-color: var(--primary);
+}
+.location-suggestions {
+  box-shadow: 0 8px 20px #281b1614;
+}
+.state {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  margin-block: 16px;
+}
+details > summary {
+  padding-block: 12px;
+}
+details[open] > summary {
+  margin-bottom: 12px;
+}
+:is(.public-app, .admin-app) dd,
+.notice,
+.prose,
+.admin-top,
+.quote-phone {
+  overflow-wrap: anywhere;
+}
+
+/* Public site: a single route motif, generous white space, direct language. */
+.public-app .container {
+  max-width: 1240px;
+}
+.public-app .header-inner {
+  min-height: 100px;
+  gap: 24px;
+}
+.public-app .brand-logo {
+  width: 68px;
+}
+.public-app .public-nav {
+  gap: 24px;
+}
+.public-app .public-nav a {
+  min-height: 44px;
+}
+.public-app .hero {
+  background: white;
+  padding-block: 72px 88px;
+}
+.public-app .hero-grid {
+  grid-template-columns: 1.25fr 0.8fr;
+  gap: 72px;
+}
+.public-app h1 {
+  font-family: var(--font-display);
+  letter-spacing: -0.8px;
+  font-weight: 600;
+}
+.public-app .hero h1 {
+  font-size: clamp(42px, 5.2vw, 72px);
+  max-width: 11ch;
+  line-height: 1.03;
+  margin-block: 20px 28px;
+}
+.public-app .hero-location {
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 15px;
+  margin: 0;
+}
+.public-app .lead {
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.7;
+  max-width: 54ch;
+}
+.public-app .hero .row {
+  margin-block: 28px 20px;
+}
+.public-app .hero-art {
+  min-height: 390px;
+  border-radius: 120px 12px 12px 12px;
+  padding: 32px;
+  background: var(--accent);
+  color: var(--foreground);
+}
+.public-app .route-card {
+  margin: 28px 0 0 24px;
+  padding: 28px;
+  box-shadow: none;
+  border-radius: 8px;
+}
+.public-app .route-card small {
+  font-size: 14px;
+  color: var(--muted);
+}
+.public-app .route-card h3 {
+  margin: 6px 0 0;
+  font-size: 24px;
+}
+.public-app .route-card > svg {
+  margin-top: 24px;
+  color: var(--primary);
+}
+.public-app .route-line {
+  height: 48px;
+  border-left: 2px dashed var(--accent);
+  margin-block: 16px;
+}
+.public-app .art-bottom {
+  font-size: 14px;
+  color: #000000;
+}
+.public-app .section {
+  padding-block: 64px;
+}
+.public-app .section-heading {
+  margin-bottom: 32px;
+}
+.public-app .service-grid {
+  gap: 32px;
+}
+.public-app .service-card {
+  border: 0;
+  border-top: 2px solid var(--accent);
+  padding: 28px 0;
+  border-radius: 0;
+}
+.public-app .service-card > svg {
+  margin: 0 0 20px;
+}
+.public-app .service-card p {
+  max-width: 45ch;
+}
+.public-app .service-card a {
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+.public-app .process-section {
+  background: #f6f5f4;
+}
+.public-app .process-card {
+  padding: 24px 0 0;
+}
+.public-app .process-card > .eyebrow {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--control-border);
+  border-radius: 50%;
+  margin-bottom: 20px;
+}
+.public-app .prose {
+  max-width: 70ch;
+  padding: 32px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+}
+.public-app .prose a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.public-app .cta-strip {
+  border-left: 4px solid var(--accent);
+  background: #f6f5f4;
+}
+.public-app .cta-strip p {
+  margin-bottom: 0;
+}
+.public-app .public-footer {
+  background: white;
+  color: var(--foreground);
+  border-top: 4px solid var(--accent);
+  padding-block: 40px;
+  margin-top: 0;
+}
+.public-app .public-footer p {
+  color: var(--muted);
+  max-width: 42ch;
+  margin-top: 12px;
+}
+.public-app .footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  font-size: 14px;
+}
+.public-app .footer-links a {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  padding-block: 8px;
+}
+.public-app .request-intro {
+  max-width: 620px;
+  margin-inline: auto;
+}
+.public-app .request-intro h1 {
+  font-size: clamp(32px, 4vw, 48px);
+}
+.public-app .form-steps {
+  max-width: 620px;
+  margin: 32px auto;
+}
+.public-app .request-card {
+  border-top: 4px solid var(--accent);
+  padding: 32px;
+}
+.public-app .form-actions {
+  justify-content: space-between;
+}
+.public-app .form-actions .button:last-child {
+  margin-left: auto;
+}
+.public-app .quote-phone {
+  border: 1px solid var(--accent);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  background: #fff0e8;
+  padding: 20px 16px;
+  margin-top: 24px;
+  margin-bottom: 0;
+  color: var(--foreground);
+  font-size: 15px;
+  font-weight: 600;
+}
+.public-app .quote-phone a {
+  color: var(--primary);
+  font-size: clamp(24px, 4vw, 30px);
+  font-weight: 750;
+  line-height: 1.4;
+  min-height: 44px;
+  padding: 4px 8px;
+  text-underline-offset: 5px;
+}
+.public-app .quote-phone a:hover {
+  text-decoration: underline;
+}
+
+/* Admin: compact navigation and a calm workspace with explicit progression. */
+.admin-app .admin-shell {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+.admin-app .sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100dvh;
+  overflow-y: auto;
+  background: #f6f5f4;
+  border-right: 1px solid var(--border);
+  padding: 24px 16px;
+  gap: 32px;
+}
+.admin-app .sidebar .brand {
+  flex-wrap: nowrap;
+  gap: 10px;
+  font-size: 14px;
+}
+.admin-app .sidebar .brand-logo {
+  width: 52px;
+}
+.admin-app .sidebar nav a {
+  color: var(--muted);
+  min-height: 46px;
+}
+.admin-app .sidebar nav a:hover {
+  background: white;
+}
+.admin-app .sidebar nav a.active {
+  background: white;
+  color: var(--primary);
+  font-weight: 700;
+  box-shadow: inset 3px 0 var(--accent);
+}
+.admin-app .admin-main {
+  padding: 24px 36px 64px;
+  max-width: 1800px;
+  width: 100%;
+}
+.admin-app .admin-top {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+}
+.admin-app .admin-top > div:first-child {
+  min-width: 0;
+}
+.admin-app .page-heading {
+  padding: 8px 0 12px;
+}
+.admin-app .page-heading h1 {
+  font-size: clamp(26px, 3vw, 36px);
+  margin: 0 0 12px;
+}
+.admin-app .page-heading p {
+  margin-bottom: 0;
+  max-width: 70ch;
+}
+.admin-app h2 {
+  font-size: 23px;
+  letter-spacing: -0.4px;
+}
+.admin-app .admin-main h3 {
+  font-size: 18px;
+}
+.admin-app .card {
+  padding: 24px;
+}
+.admin-app .card > :last-child {
+  margin-bottom: 0;
+}
+.admin-app .metrics {
+  margin: 4px 0;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.admin-app .metric {
+  border: 0;
+  border-radius: 0;
+  border-right: 1px solid var(--border);
+  padding: 22px;
+}
+.admin-app .metric:last-child {
+  border-right: 0;
+}
+.admin-app .metric .row {
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.admin-app .metric svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+.admin-app .metric strong {
+  font-size: 38px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  margin-top: 16px;
+}
+.admin-app .filter-bar {
+  background: #f6f5f4;
+  border: 0;
+}
+.admin-app table {
+  font-size: 14px;
+}
+.admin-app th {
+  background: #f6f5f4;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+.admin-app tbody tr:hover {
+  background: #fff8f4;
+}
+.admin-app .table-wrap {
+  max-width: 100%;
+}
+.admin-app .badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: #edf5ef;
+  color: #245945;
+}
+.admin-app .badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.admin-app .badge[data-status="NEW"],
+.admin-app .badge[data-status="PENDING_REVIEW"],
+.admin-app .badge[data-status="ESTIMATED"] {
+  background: #fff1cf;
+  color: #725014;
+}
+.admin-app .badge[data-status="CANCELLED"] {
+  background: #fcecec;
+  color: #952c36;
+}
+.admin-app .badge[data-status="QUOTED"],
+.admin-app .badge[data-status="CONTACTED"] {
+  background: #f0eef8;
+  color: #5a4286;
+}
+.admin-app .badge[data-status="IN_PROGRESS"] {
+  background: #eaf2fc;
+  color: #265686;
+}
+.admin-app .workflow-section {
+  scroll-margin-top: 24px;
+  border-left: 3px solid var(--border);
+}
+.admin-app .workflow-section[data-current="true"] {
+  border-left-color: var(--accent);
+}
+.admin-app .workflow-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+  margin: 0;
+}
+.admin-app .workflow-nav > li > a {
+  display: block;
+  padding: 14px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+}
+.admin-app .workflow-nav a[aria-current="step"] {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #fff8f4;
+  font-weight: 700;
+}
+.admin-app .workflow-next {
+  margin: 0;
+}
+.admin-app .move-results {
+  background: #fff8f4;
+  padding: 28px;
+}
+.admin-app .move-results-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+}
+.admin-app .move-results-grid dd {
+  font-variant-numeric: tabular-nums;
+}
+.admin-app .move-results-total {
+  grid-column: 1 / -1;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.admin-app .move-results-total dd {
+  font-size: clamp(32px, 4vw, 46px);
+}
+.admin-app .auth-aside {
+  background: #f6f5f4;
+  border-left: 8px solid var(--accent);
+  padding: clamp(32px, 5vw, 80px);
+}
+.admin-app .auth-aside h1 {
+  font-size: clamp(32px, 4vw, 56px);
+  letter-spacing: -1.5px;
+  max-width: 14ch;
+}
+.admin-app .auth-form {
+  padding: 48px 32px;
+}
+
+@media (max-width: 1100px) {
+  .public-app .hero-grid {
+    gap: 32px;
+  }
+  .admin-app .admin-main {
+    padding-inline: 24px;
+  }
+  .admin-app .metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .admin-app .metric {
+    border-bottom: 1px solid var(--border);
+  }
+}
+@media (max-width: 900px) {
+  .public-app .header-inner {
+    gap: 16px;
+    padding-block: 16px;
+  }
+  .public-app .public-nav {
+    justify-content: flex-start;
+  }
+  .public-app .hero {
+    padding-block: 40px;
+  }
+  .public-app .hero-art {
+    padding: 24px;
+    min-height: 340px;
+  }
+  .public-app .route-card {
+    margin-left: 0;
+    padding: 24px;
+  }
+  .admin-app .workflow-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .public-app .hero-grid {
+    grid-template-columns: 1fr;
+  }
+  .public-app .hero h1 {
+    max-width: 14ch;
+  }
+  .public-app .hero-art {
+    min-height: 300px;
+    max-width: 480px;
+    width: 100%;
+  }
+  .public-app .section {
+    padding-block: 40px;
+  }
+  .admin-app .sidebar {
+    height: auto;
+    max-height: 45dvh;
+    z-index: 20;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    gap: 16px;
+  }
+  .admin-app .sidebar nav {
+    gap: 4px;
+    padding-bottom: 4px;
+  }
+  .admin-app .sidebar nav a {
+    padding: 10px 14px;
+  }
+  .admin-app .admin-main {
+    padding: 20px 16px 40px;
+  }
+  .admin-app .admin-top {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .admin-app .admin-top .actions {
+    gap: 8px;
+  }
+  .admin-app .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-app .metric {
+    padding: 16px;
+  }
+  .admin-app .metric strong {
+    font-size: 32px;
+  }
+  .admin-app .card {
+    padding: 20px;
+  }
+  .admin-app .auth-aside {
+    min-height: auto;
+    gap: 24px;
+    padding: 24px;
+  }
+  .admin-app .auth-aside h1 {
+    max-width: 22ch;
+    font-size: 30px;
+  }
+  .admin-app .auth-aside > .small {
+    display: none;
+  }
+  .admin-app .move-results {
+    padding: 20px;
+  }
+  .admin-app .move-results-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .public-app .container {
+    padding-inline: 20px;
+  }
+  .public-app .brand {
+    font-size: 14px;
+    gap: 8px;
+  }
+  .public-app .brand-logo {
+    width: 48px;
+  }
+  .public-app .brand small {
+    font-size: 11px;
+  }
+  .public-app .header-inner {
+    gap: 12px;
+  }
+  .public-app .public-nav {
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .public-app .public-nav a {
+    font-size: 13px;
+  }
+  .public-app .hero h1 {
+    font-size: 42px;
+  }
+  .public-app .hero .row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .public-app .hero .row > a:not(.button) {
+    padding-block: 8px;
+  }
+  .public-app .hero-art {
+    border-top-left-radius: 64px;
+  }
+  .public-app .request-card {
+    padding: 24px 18px;
+  }
+  .public-app .form-actions {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .public-app .prose {
+    font-size: 16px;
+  }
+  .admin-app .filter-bar .field {
+    min-width: 0;
+    flex-basis: 100%;
+  }
+  .admin-app .workflow-nav a {
+    font-size: 13px;
+  }
+  .admin-app .review-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: The accessibility preference overrides component motion. */
+    scroll-behavior: auto !important;
+    /* biome-ignore lint/complexity/noImportantStyles: The accessibility preference overrides component motion. */
+    animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: The accessibility preference overrides component motion. */
+    transition: none !important;
+  }
 }
