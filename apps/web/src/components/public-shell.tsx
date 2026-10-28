@@ -46,7 +46,9 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <main id="main">{children}</main>
+      <main id="main" tabIndex={-1}>
+        {children}
+      </main>
       <footer className="public-footer">
         <div className="container footer-inner">
           <div>
@@ -63,6 +65,11 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
             <p className="small">
               {t("Lunes a sábado · Español / English", "Monday–Saturday · Español / English")}
             </p>
+            <nav className="footer-links" aria-label={t("Información legal", "Legal information")}>
+              <a href="/privacy">{t("Privacidad", "Privacy")}</a>
+              <a href="/terms">{t("Condiciones", "Terms")}</a>
+              <a href="/contact">{t("Contacto", "Contact")}</a>
+            </nav>
           </div>
         </div>
       </footer>

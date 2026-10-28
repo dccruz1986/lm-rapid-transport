@@ -10,7 +10,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
   const locale = (await cookies()).get("lm_locale")?.value === "en" ? "en" : "es";
   return (
     <html lang={locale}>
-      <body>
+      <body className="admin-app">
         <LanguageProvider initialLocale={locale}>{children}</LanguageProvider>
       </body>
     </html>

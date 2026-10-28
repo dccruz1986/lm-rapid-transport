@@ -4,6 +4,7 @@ import { Button, useLanguage } from "@lm/ui";
 import { LocationField } from "@lm/ui/location-field";
 import {
   moveSizes,
+  partialLocationSchema,
   type IntakeV2 as RequestInput,
   intakeV2Schema as requestSchema,
   validFileMetadata,
@@ -48,10 +49,13 @@ export function RequestForm({ phone }: { phone: string }) {
     },
   });
   const { errors } = form.formState;
-  void errors;
   form.watch(["origin", "destination"]);
   const hasSize = form.watch("property_size") !== null;
   const errorsText: Record<string, [string, string]> = {
+    INVALID_INPUT: [
+      "Revisa los campos indicados antes de continuar.",
+      "Check the highlighted fields before continuing.",
+    ],
     SPAM_CHECK: [
       "El autocompletado pudo rellenar un campo oculto. Recarga la página con las extensiones de autocompletado desactivadas e inténtalo de nuevo.",
       "Autofill may have filled a hidden field. Reload with autofill extensions disabled and try again.",
@@ -248,7 +252,6 @@ export function RequestForm({ phone }: { phone: string }) {
   return (
     <section className="section container form-container">
       <div className="request-intro">
-        <span className="eyebrow">{t("HAGAMOS EL PRIMER PASO", "LET'S TAKE THE FIRST STEP")}</span>
         <h1>{t("Cuéntanos de tu mudanza.", "Tell us about your move.")}</h1>
         <p className="lead">
           {t(
@@ -315,7 +318,11 @@ export function RequestForm({ phone }: { phone: string }) {
                   label={side === "origin" ? t("Origen", "Pickup") : t("Destino", "Destination")}
                   value={form.getValues(side)}
                   onChange={(value) => form.setValue(side, value, { shouldValidate: true })}
-                  invalid={!!form.getFieldState(side).error}
+                  invalid={
+                    !!errors[side] ||
+                    (error === "INVALID_INPUT" &&
+                      !partialLocationSchema.safeParse(form.getValues(side)).success)
+                  }
                   disabled={busy || begun}
                 />
               ))}

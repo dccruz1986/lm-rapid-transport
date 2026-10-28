@@ -1,15 +1,6 @@
 "use client";
 import { Button, useLanguage } from "@lm/ui";
-import {
-  ArrowRight,
-  Building2,
-  CalendarDays,
-  Home,
-  MessageCircle,
-  PackageCheck,
-  Store,
-  Truck,
-} from "lucide-react";
+import { Building2, CalendarDays, Home, MessageCircle, PackageCheck, Store, Truck } from "lucide-react";
 export function Services() {
   const { t } = useLanguage();
   return (
@@ -43,10 +34,7 @@ export function Services() {
             <ServiceIcon size={30} aria-hidden="true" />
             <h2>{t(String(es), String(en))}</h2>
             <p className="muted">{t(String(bodyEs), String(bodyEn))}</p>
-            <a href="/request-quote">
-              {t("Cuéntanos qué necesitas", "Tell us what you need")}{" "}
-              <ArrowRight size={16} aria-hidden="true" />
-            </a>
+            <a href="/request-quote">{t("Cuéntanos qué necesitas", "Tell us what you need")} </a>
           </article>
         );
       })}
@@ -60,10 +48,10 @@ export function HomeContent() {
       <section className="hero">
         <div className="container hero-grid">
           <div>
-            <span className="eyebrow">
-              {t("MIAMI, FLORIDA · TU PRÓXIMO COMIENZO", "MIAMI, FLORIDA · YOUR NEXT BEGINNING")}
-            </span>
-            <h1>{t("Tu mudanza, en buenas manos.", "Your move, in good hands.")}</h1>
+            <p className="hero-location">
+              {t("Desde Miami, dentro de Florida", "From Miami, across Florida")}
+            </p>
+            <h1>{t("De aquí a tu próximo hogar.", "From here to your next home.")}</h1>
             <p className="lead">
               {t(
                 "Un nuevo hogar. Una nueva oficina. El mismo cuidado en cada paso. Planifiquemos juntos tu mudanza dentro de Florida.",
@@ -72,10 +60,7 @@ export function HomeContent() {
             </p>
             <div className="row">
               <Button asChild>
-                <a href="/request-quote">
-                  {t("Cuéntanos sobre tu mudanza", "Tell us about your move")}
-                  <ArrowRight size={18} />
-                </a>
+                <a href="/request-quote">{t("Solicitar cotización", "Request a quote")}</a>
               </Button>
               <a href="/services">{t("Ver servicios", "Explore services")}</a>
             </div>
@@ -87,13 +72,12 @@ export function HomeContent() {
             </p>
           </div>
           <div className="hero-art">
-            <div className="art-grid" />
             <div className="route-card">
-              <small>{t("DE DONDE ESTÁS", "FROM WHERE YOU ARE")}</small>
+              <small>{t("Origen", "Pickup")}</small>
               <h3>Miami, Florida</h3>
               <div className="route-line" />
-              <small>{t("A TU PRÓXIMO CAPÍTULO", "TO YOUR NEXT CHAPTER")}</small>
-              <h3>{t("Un nuevo comienzo", "A fresh start")}</h3>
+              <small>{t("Destino", "Destination")}</small>
+              <h3>{t("Tu siguiente dirección", "Your next address")}</h3>
               <Truck size={44} aria-hidden="true" />
             </div>
             <div className="art-bottom">
@@ -109,15 +93,13 @@ export function HomeContent() {
       </section>
       <section className="section container">
         <div className="section-heading">
-          <span className="eyebrow">{t("ESPACIOS QUE CAMBIAN", "SPACES THAT CHANGE")}</span>
-          <h2>{t("Una mudanza para cada etapa.", "A move for every chapter.")}</h2>
+          <h2>{t("¿Qué vas a mudar?", "What are you moving?")}</h2>
         </div>
         <Services />
       </section>
       <section className="section process-section">
         <div className="container">
-          <span className="eyebrow">{t("ASÍ DE SENCILLO", "KEEPING IT SIMPLE")}</span>
-          <h2>{t("Del primer detalle al último bulto.", "From the first detail to the last box.")}</h2>
+          <h2>{t("Así organizamos tu mudanza", "How we plan your move")}</h2>
           <div className="service-grid">
             {[
               [
@@ -173,7 +155,6 @@ export function InfoContent({
   const { t } = useLanguage();
   return (
     <section className="section container">
-      <span className="eyebrow">LM RAPID TRANSPORT · FLORIDA</span>
       <h1>
         {kind === "services"
           ? t("Nos encargamos del siguiente paso.", "We help with the next step.")
