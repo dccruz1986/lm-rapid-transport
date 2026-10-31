@@ -21,9 +21,12 @@ export function Dashboard({
   return (
     <div className="stack">
       <PageHeading
-        es="Todo listo para el próximo paso."
-        en="Ready for the next step."
-        subtitle={["Una vista de tus operaciones en Florida.", "A view of your operations across Florida."]}
+        es="Resumen de operaciones"
+        en="Operations overview"
+        subtitle={[
+          "Solicitudes por atender y mudanzas en marcha.",
+          "Requests to review and moves in progress.",
+        ]}
       />
       <div className="metrics">
         {cards.map(({ key, es, en, Icon }) => (

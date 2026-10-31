@@ -11,11 +11,13 @@ import {
   scheduleMove,
 } from "@/app/(staff)/workflow-actions";
 import { ConfirmedForm } from "./confirmed-form";
+import { RequestEditor, type RequestRecord } from "./record-forms";
 import { DateText, initialResult, ResultNotice, StatusBadge } from "./record-ui";
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 type Props = {
-  request: Row<"moving_requests">;
+  routeReady: boolean;
+  request: RequestRecord;
   quote: Row<"quotes"> | null;
   move: Row<"moves"> | null;
   settings: Row<"pricing_settings">;
@@ -103,7 +105,17 @@ function TimeField({
 function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quote" | "settings">) {
   const { t } = useLanguage();
   const [state, action, pending] = useActionState(saveQuote, initialResult);
-  const [mode, setMode] = useState<"LOCAL" | "PER_MILE">(quote?.mode === "PER_MILE" ? "PER_MILE" : "LOCAL");
+  const [mode, setMode] = useState<"" | "LOCAL" | "PER_MILE">(
+    quote?.mode === "PER_MILE"
+      ? "PER_MILE"
+      : quote
+        ? "LOCAL"
+        : request.suggested_mode === "PER_MILE"
+          ? "PER_MILE"
+          : request.suggested_mode === "LOCAL"
+            ? "LOCAL"
+            : "",
+  );
   const [workers, setWorkers] = useState(quote?.workers ?? request.workers ?? 2);
   const rateFor = (m: string, w: number) =>
     m === "PER_MILE"
@@ -113,24 +125,27 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
         : w === 3
           ? settings.hourly_three
           : settings.hourly_four;
-  const [rate, setRate] = useState(((quote?.rate_cents ?? rateFor(mode, workers)) / 100).toFixed(2));
+  const [rate, setRate] = useState(
+    mode ? ((quote?.rate_cents ?? rateFor(mode, workers)) / 100).toFixed(2) : "",
+  );
   const [quantity, setQuantity] = useState(String(quote?.estimated_quantity ?? 3));
   let preview: number | null = null;
   try {
-    preview = calculateTotal(
-      mode,
-      Number(quantity),
-      dollarsToCents(rate),
-      quote?.minimum_hours ?? settings.minimum_hours,
-    ).totalCents;
+    if (mode)
+      preview = calculateTotal(
+        mode === "PER_MILE" ? "PER_MILE" : "LOCAL",
+        Number(quantity),
+        dollarsToCents(rate),
+        quote?.minimum_hours ?? settings.minimum_hours,
+      ).totalCents;
   } catch {}
   return (
     <form action={action} className="stack">
       <Identity request={request.id} version={quote?.version ?? 0} />
       <p className="muted">
         {t(
-          "Confirma los límites municipales: LOCAL solo si ambos extremos están en la ciudad de Miami. El nombre postal no basta.",
-          "Verify city boundaries: LOCAL only when both addresses are within the City of Miami. A Miami postal address is not enough.",
+          "Confirma los condados: LOCAL solo si ambos extremos están en la condado Miami-Dade. El nombre postal no basta.",
+          "Verify county boundaries: LOCAL only when both addresses are within the Miami-Dade County. A Miami postal address is not enough.",
         )}
       </p>
       <div className="form-grid">
@@ -138,14 +153,21 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
           {t("Modalidad", "Pricing mode")}
           <select
             name="mode"
+            required
             value={mode}
             onChange={(e) => {
               const m = e.target.value as "LOCAL" | "PER_MILE";
               setMode(m);
-              if (!quote) setRate((rateFor(m, workers) / 100).toFixed(2));
+              setRate((rateFor(m, workers) / 100).toFixed(2));
             }}
           >
-            <option value="LOCAL">{t("Local — ciudad de Miami", "Local — City of Miami")}</option>
+            <option value="" disabled>
+              {t(
+                "Selecciona la modalidad tras revisar el recorrido",
+                "Select a mode after reviewing the route",
+              )}
+            </option>
+            <option value="LOCAL">{t("Local — condado Miami-Dade", "Local — Miami-Dade County")}</option>
             <option value="PER_MILE">{t("Por millas — Florida", "Per mile — Florida")}</option>
           </select>
         </label>
@@ -157,7 +179,7 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
             onChange={(e) => {
               const w = Number(e.target.value);
               setWorkers(w);
-              if (!quote) setRate((rateFor(mode, w) / 100).toFixed(2));
+              setRate(mode ? (rateFor(mode, w) / 100).toFixed(2) : "");
             }}
           >
             {[2, 3, 4].map((w) => (
@@ -168,9 +190,11 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
           </select>
         </label>
         <label className="field">
-          {mode === "LOCAL"
-            ? t("Tarifa del equipo (USD/h)", "Crew rate (USD/h)")
-            : t("Tarifa (USD/milla)", "Rate (USD/mile)")}
+          {!mode
+            ? t("Tarifa (elige modalidad)", "Rate (select a mode)")
+            : mode === "LOCAL"
+              ? t("Tarifa del equipo (USD/h)", "Crew rate (USD/h)")
+              : t("Tarifa (USD/milla)", "Rate (USD/mile)")}
           <input
             type="number"
             name="rate"
@@ -183,9 +207,11 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
           />
         </label>
         <label className="field">
-          {mode === "LOCAL"
-            ? t("Horas estimadas", "Estimated hours")
-            : t("Millas estimadas de ida", "Estimated one-way miles")}
+          {!mode
+            ? t("Cantidad estimada (elige modalidad)", "Estimated quantity (select a mode)")
+            : mode === "LOCAL"
+              ? t("Horas estimadas", "Estimated hours")
+              : t("Millas estimadas de ida", "Estimated one-way miles")}
           <input
             type="number"
             name="quantity"
@@ -233,7 +259,7 @@ function QuoteApproval({
         )}
         {["ACCEPTED", "CONFIRMED"].includes(quote.status) && permissions.includes("quotes.edit") && (
           <Button name="action" value="reopen" variant="outline" disabled={pending}>
-            {t("Reabrir para revisar condiciones", "Reopen to review terms")}
+            {t("Volver a edición de datos y tarifas", "Return to editing details and rates")}
           </Button>
         )}
       </div>
@@ -241,13 +267,24 @@ function QuoteApproval({
     </form>
   );
 }
-function CommunicationForm({ request, quote, now }: { request: string; quote: Row<"quotes">; now: string }) {
+function CommunicationForm({
+  request,
+  quote,
+  now,
+  routeReady,
+}: {
+  request: string;
+  quote: Row<"quotes">;
+  now: string;
+  routeReady: boolean;
+}) {
   const { t } = useLanguage();
   const [state, action, pending] = useActionState(communicateQuote, initialResult);
+  const [confirm, setConfirm] = useState(false);
   return (
     <form action={action} className="stack">
       <Identity request={request} version={quote.version} />
-      <h3>{t("Registrar comunicación manual", "Record manual communication")}</h3>
+      <h3>{t("Registrar conversación y aceptación", "Record conversation and acceptance")}</h3>
       <TimeField
         name="at"
         label={t("Fecha y hora de comunicación", "Communication date and time")}
@@ -263,15 +300,29 @@ function CommunicationForm({ request, quote, now }: { request: string; quote: Ro
       </label>
       <label className="field">
         {t("Respuesta del cliente", "Customer response")}
-        <textarea name="response" maxLength={2000} rows={3} />
+        <textarea name="response" maxLength={2000} rows={3} required={confirm && routeReady} />
       </label>
       <label className="row">
-        <input type="checkbox" name="confirm" />
+        <input
+          type="checkbox"
+          name="confirm"
+          disabled={!routeReady}
+          checked={confirm && routeReady}
+          onChange={(event) => setConfirm(event.target.checked)}
+        />
         {t(
           "El cliente aceptó expresamente estas tarifas y condiciones; el total depende de las cantidades reales.",
           "The customer explicitly accepted these rates and terms; the total depends on actual quantities.",
         )}
       </label>
+      {!routeReady && (
+        <p className="notice">
+          {t(
+            "Puedes registrar la comunicación sin confirmar la cotización. Para registrar la aceptación del cliente: reabre la cotización, completa ambas direcciones y revisa los condados en el paso 1: Datos del cliente y direcciones; después aprueba de nuevo. Los puntos del mapa por ZIP no confirman las direcciones.",
+            "You can record the communication without confirming the quote. To record customer acceptance: reopen the quote, complete both addresses and review counties in step 1: Customer details and addresses, then approve again. ZIP map points do not confirm addresses.",
+          )}
+        </p>
+      )}
       <ResultNotice result={state} />
       <Button disabled={pending}>{t("Registrar comunicación", "Record communication")}</Button>
     </form>
@@ -403,6 +454,38 @@ export function Workflow(props: Props) {
   const { t } = useLanguage();
   const editable =
     request.status !== "CANCELLED" && (move?.status !== "COMPLETED" || permissions.includes("moves.correct"));
+  const stage =
+    request.status === "CANCELLED" || move?.status === "COMPLETED"
+      ? null
+      : quote?.status === "CONFIRMED"
+        ? 3
+        : quote?.status === "ACCEPTED"
+          ? 2
+          : !props.routeReady && !quote
+            ? 0
+            : 1;
+  const stages = [
+    {
+      id: "request-information",
+      es: "Datos y direcciones",
+      en: "Details and addresses",
+      permission: "requests.edit",
+    },
+    { id: "request-quote", es: "Cotización", en: "Quote", permission: "quotes.edit" },
+    {
+      id: "request-acceptance",
+      es: "Comunicación y aceptación",
+      en: "Communication and acceptance",
+      permission: "quotes.confirm",
+    },
+    {
+      id: "request-schedule",
+      es: "Programación y mudanza",
+      en: "Scheduling and move",
+      permission: move?.status === "IN_PROGRESS" ? "moves.operate" : "moves.schedule",
+    },
+  ];
+  const currentStage = stage === null ? undefined : stages[stage];
   const fields: Record<string, [string, string]> = {
     rate_cents: ["Tarifa (centavos USD)", "Rate (USD cents)"],
     estimated_quantity: ["Cantidad estimada", "Estimated quantity"],
@@ -413,8 +496,64 @@ export function Workflow(props: Props) {
   };
   return (
     <>
-      <section className="card stack">
-        <h2>{t("Cotización", "Quote")}</h2>
+      <nav id="request-workflow" aria-label={t("Etapas de la solicitud", "Request stages")}>
+        <ol className="workflow-nav">
+          {stages.map((item, index) => (
+            <li key={item.id}>
+              <a href={`#${item.id}`} aria-current={stage === index ? "step" : undefined}>
+                {index + 1}. {t(item.es, item.en)}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+      {currentStage && (
+        <p className="notice workflow-next">
+          <strong>
+            {t("Siguiente etapa", "Next stage")}: {t(currentStage.es, currentStage.en)}.
+          </strong>{" "}
+          {!permissions.includes(currentStage.permission)
+            ? t(
+                "Tu rol permite consultar esta etapa; el cambio requiere personal autorizado.",
+                "You can review this stage; changes require authorized staff.",
+              )
+            : t(
+                "Revisa los requisitos del formulario antes de continuar.",
+                "Review the form requirements before continuing.",
+              )}
+        </p>
+      )}
+      <section className="card stack workflow-section" data-current={stage === 0} id="request-information">
+        <h2>{t("1. Revisar datos y direcciones", "1. Review details and addresses")}</h2>
+        <p className="muted">
+          {t(
+            "Completa las direcciones, revisa los condados y guarda. Esta revisión es del personal; la aceptación del cliente se registra en el paso 3.",
+            "Complete the addresses, review the counties and save. This is a staff review; customer acceptance is recorded in step 3.",
+          )}
+        </p>
+        {editable && quote && ["ACCEPTED", "CONFIRMED"].includes(quote.status) && (
+          <>
+            <p className="notice">
+              {t(
+                "La cotización ya está aprobada. Solo si necesitas cambiar datos del recorrido o tarifas, vuelve a edición con este botón. Después tendrás que aprobar nuevamente y registrar la aceptación de las condiciones vigentes.",
+                "The quote is already approved. Only return to editing if you need to change route details or rates. Afterwards, approve again and record acceptance of the current terms.",
+              )}
+            </p>
+            <QuoteApproval request={request.id} quote={quote} permissions={permissions} />
+          </>
+        )}
+        {editable && permissions.includes("requests.edit") && (
+          <RequestEditor key={request.id} request={request} />
+        )}
+      </section>
+      <section className="card stack workflow-section" data-current={stage === 1} id="request-quote">
+        <h2>{t("2. Guardar y aprobar la cotización", "2. Save and approve the quote")}</h2>
+        <p className="muted">
+          {t(
+            "Primero guarda las tarifas; después pulsa Aprobar internamente. Esta aprobación no representa la aceptación del cliente.",
+            "Save the rates first, then select Approve internally. This approval does not represent customer acceptance.",
+          )}
+        </p>
         <p className="notice">
           {t(
             "Precio aproximado, sujeto a las horas o millas reales. Camión e impuestos incluidos. La confirmación corresponde a las tarifas y condiciones, no a un total fijo.",
@@ -445,12 +584,32 @@ export function Workflow(props: Props) {
         {editable && permissions.includes("quotes.edit") && (
           <QuoteEditor key={quote?.version ?? 0} request={request} quote={quote} settings={settings} />
         )}
-        {editable && quote && <QuoteApproval request={request.id} quote={quote} permissions={permissions} />}
+        {editable && quote?.status === "ESTIMATED" && (
+          <QuoteApproval request={request.id} quote={quote} permissions={permissions} />
+        )}
+      </section>
+      <section className="card stack workflow-section" data-current={stage === 2} id="request-acceptance">
+        <h2>{t("3. Comunicar y registrar la aceptación", "3. Communicate and record acceptance")}</h2>
+        <p className="muted">
+          {t(
+            "Registra la conversación. Marca la aceptación solo cuando el cliente acepte las tarifas y condiciones. Para habilitarla, completa el paso 1.",
+            "Record the conversation. Mark acceptance only when the customer accepts the rates and terms. Complete step 1 to enable it.",
+          )}
+        </p>
+        {(!quote || quote.status === "ESTIMATED") && (
+          <p className="notice">
+            {t(
+              "Pendiente: guarda y aprueba la cotización en el paso 2 para habilitar este formulario.",
+              "Pending: save and approve the quote in step 2 to enable this form.",
+            )}
+          </p>
+        )}
         {editable &&
           quote &&
           ["ACCEPTED", "CONFIRMED"].includes(quote.status) &&
           permissions.includes("quotes.confirm") && (
             <CommunicationForm
+              routeReady={props.routeReady}
               key={`communication-${quote.version}`}
               request={request.id}
               quote={quote}
@@ -478,8 +637,8 @@ export function Workflow(props: Props) {
           ))}
         </details>
       </section>
-      <section className="card stack">
-        <h2>{t("Mudanza", "Move")}</h2>
+      <section className="card stack workflow-section" data-current={stage === 3} id="request-schedule">
+        <h2>{t("4. Programar y gestionar la mudanza", "4. Schedule and manage the move")}</h2>
         {move ? (
           <>
             <StatusBadge status={move.status} />
@@ -487,27 +646,67 @@ export function Workflow(props: Props) {
               {t("Programada", "Scheduled")}: <DateText value={move.scheduled_at} time />
             </p>
             <p>{move.notes}</p>
-            {move.final_total_cents !== null && (
-              <p>
-                {t("Importe final con condiciones aceptadas", "Final amount under accepted terms")}:{" "}
-                <Money cents={move.final_total_cents} />
-              </p>
+            {(move.started_at || move.final_total_cents !== null) && (
+              <section className="move-results" aria-label={t("Resultados de la mudanza", "Move results")}>
+                <h3>{t("Resumen de la mudanza", "Move summary")}</h3>
+                <dl className="move-results-grid">
+                  <div className="move-results-total">
+                    <dt>
+                      {t("Importe final con condiciones aceptadas", "Final amount under accepted terms")}
+                    </dt>
+                    <dd>
+                      {move.final_total_cents !== null ? (
+                        <Money cents={move.final_total_cents} />
+                      ) : (
+                        t("Pendiente de cierre", "Pending completion")
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t("Horas trabajadas", "Time worked")}</dt>
+                    <dd>
+                      {move.started_at && move.finished_at
+                        ? (() => {
+                            const minutes = Math.max(
+                              0,
+                              Math.round(
+                                (Date.parse(move.finished_at) - Date.parse(move.started_at)) / 60000,
+                              ),
+                            );
+                            return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+                          })()
+                        : t("En curso", "In progress")}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t("Hora de llegada", "Arrival time")}</dt>
+                    <dd>{move.started_at ? <DateText value={move.started_at} time /> : "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>{t("Descarga finalizada", "Unloading completed")}</dt>
+                    <dd>
+                      {move.finished_at ? (
+                        <DateText value={move.finished_at} time />
+                      ) : (
+                        t("Pendiente", "Pending")
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+                {quote?.mode === "LOCAL" && (
+                  <p className="small muted">
+                    {t(
+                      "Tiempo real entre llegada y finalización. El importe aplica el mínimo contratado y el redondeo por hora.",
+                      "Actual time between arrival and completion. The amount applies the agreed minimum and hourly rounding.",
+                    )}
+                  </p>
+                )}
+              </section>
             )}
             {move.revised_total_cents !== null && (
               <p className="notice">
                 {t("Importe revisado pendiente de aceptación", "Revised amount awaiting acceptance")}:{" "}
                 <Money cents={move.revised_total_cents} />
-              </p>
-            )}
-            {move.started_at && (
-              <p>
-                {t("Llegada", "Arrival")}: <DateText value={move.started_at} time />
-                {move.finished_at && (
-                  <>
-                    {" "}
-                    · {t("Finalización", "Finish")}: <DateText value={move.finished_at} time />
-                  </>
-                )}
               </p>
             )}
             {move.actual_miles !== null && (

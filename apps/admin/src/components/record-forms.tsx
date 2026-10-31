@@ -1,9 +1,12 @@
 "use client";
 import type { Database } from "@lm/types/database";
 import { Button, useLanguage } from "@lm/ui";
+import { LocationField } from "@lm/ui/location-field";
+import { displayName } from "@lm/validation";
 import { useActionState, useState } from "react";
 import { changeRequest, editCustomer, editRequest, saveNote } from "@/app/(staff)/actions";
 import { DateText, initialResult, ResultNotice } from "./record-ui";
+import { useRouteAddresses } from "./route-addresses";
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 export type RequestRecord = Row<"moving_requests"> & {
@@ -13,23 +16,28 @@ export type RequestRecord = Row<"moving_requests"> & {
 function ContactFields({
   value,
 }: {
-  value: { first_name: string; last_name: string; phone: string; email: string | null };
+  value: {
+    full_name: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    phone: string;
+    email: string | null;
+  };
 }) {
   const { t } = useLanguage();
   return (
     <>
       {[
-        ["first_name", "Nombre", "First name"],
-        ["last_name", "Apellido", "Last name"],
+        ["full_name", "Nombre completo", "Full name"],
         ["phone", "Teléfono EE. UU.", "US phone"],
       ].map(([name, es, en]) => (
         <label className="field" key={name}>
           {t(es ?? "", en ?? "")}
           <input
             name={name}
-            defaultValue={value[name as "first_name" | "last_name" | "phone"]}
+            defaultValue={name === "full_name" ? displayName(value) : value.phone}
             required
-            maxLength={name === "phone" ? 40 : 80}
+            maxLength={name === "phone" ? 40 : 160}
           />
         </label>
       ))}
@@ -63,55 +71,75 @@ export function CustomerEditor({ customer }: { customer: Row<"customers"> }) {
   );
 }
 export function RequestEditor({ request }: { request: RequestRecord }) {
+  const { addresses, edit, select } = useRouteAddresses();
   const { t } = useLanguage();
   const [state, action, pending] = useActionState(editRequest, initialResult);
-  const [property, setProperty] = useState(request.property_type);
+  const [property, setProperty] = useState(request.property_type ?? "");
   return (
-    <details className="card">
-      <summary>{t("Editar información de la solicitud", "Edit request information")}</summary>
+    <details className="card" open>
+      <summary>{t("Datos del cliente y direcciones", "Customer details and addresses")}</summary>
       <form action={action} className="stack" style={{ marginTop: 24 }}>
         <input type="hidden" name="id" value={request.id} />
         <input type="hidden" name="version" value={request.version} />
         <div className="form-grid">
           <ContactFields value={request} />
         </div>
-        {(["origin", "destination"] as const).map((side) => (
+        {(["origin", "destination"] as const).map((side, index) => (
           <fieldset key={side} className="address-group">
             <legend>{side === "origin" ? t("Origen", "Origin") : t("Destino", "Destination")} · FL</legend>
+            <LocationField
+              label={t("Buscar dirección o ZIP", "Search address or ZIP")}
+              value={{ input: addresses[index]?.input ?? "", resolution_token: null }}
+              onChange={(value) => edit(index, value.input)}
+              onPlaceSelect={(position, address) => select(index, position, address)}
+              invalid={false}
+              disabled={pending}
+            />
             <div className="form-grid">
-              {[
-                ["street", "Dirección", "Street"],
-                ["unit", "Unidad (opcional)", "Unit (optional)"],
-                ["city", "Ciudad", "City"],
-                ["postal_code", "Código postal", "ZIP code"],
-              ].map(([name, es, en]) => (
-                <label key={name} className="field">
-                  {t(es ?? "", en ?? "")}
-                  <input
-                    name={`${side}.${name}`}
-                    defaultValue={request[side][name as "street" | "unit" | "city" | "postal_code"]}
-                    required={name !== "unit"}
-                  />
-                </label>
+              {(["street", "city", "postal_code"] as const).map((name) => (
+                <input
+                  key={name}
+                  type="hidden"
+                  name={`${side}.${name}`}
+                  value={addresses[index]?.[name] ?? ""}
+                />
               ))}
+              <label className="field">
+                {t("Unidad (opcional)", "Unit (optional)")}
+                <input name={`${side}.unit`} defaultValue={request[side].unit ?? ""} />
+              </label>
               <label className="field">
                 {t("Piso", "Floor")}
                 <input
                   name={`${side}_floor`}
                   type="number"
-                  defaultValue={request[`${side}_floor`]}
+                  defaultValue={request[`${side}_floor`] ?? ""}
                   min={-5}
                   max={150}
-                  required
                 />
               </label>
-              <label className="check-field">
-                <input
-                  name={`${side}_elevator`}
-                  type="checkbox"
-                  defaultChecked={request[`${side}_elevator`]}
-                />
-                {t("Elevador disponible", "Elevator available")}
+              <label className="field">
+                {t("Elevador", "Elevator")}
+                <select
+                  name={side + "_elevator"}
+                  defaultValue={
+                    request[(side + "_elevator") as "origin_elevator" | "destination_elevator"] === null
+                      ? ""
+                      : String(request[(side + "_elevator") as "origin_elevator" | "destination_elevator"])
+                  }
+                >
+                  <option value="">{t("No indicado", "Not provided")}</option>
+                  <option value="true">{t("Sí", "Yes")}</option>
+                  <option value="false">No</option>
+                </select>
+              </label>
+              <label className="field">
+                {t("Condado verificado", "Verified county")}
+                <select name={side + "_county"} defaultValue={request[side].county ?? ""} required>
+                  <option value="">{t("Seleccionar", "Select")}</option>
+                  <option value="MIAMI_DADE">Miami-Dade</option>
+                  <option value="OTHER_FL">{t("Otro condado de Florida", "Other Florida county")}</option>
+                </select>
               </label>
             </div>
           </fieldset>
@@ -120,6 +148,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
           <label className="field">
             {t("Tipo de propiedad", "Property type")}
             <select name="property_type" value={property} onChange={(e) => setProperty(e.target.value)}>
+              <option value="">{t("Por definir", "Not specified")}</option>
               <option value="HOUSE">{t("Casa", "House")}</option>
               <option value="APARTMENT">{t("Apartamento", "Apartment")}</option>
               <option value="OFFICE">{t("Oficina", "Office")}</option>
@@ -134,7 +163,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
                 type="number"
                 min={0}
                 max={20}
-                defaultValue={request.bedrooms ?? 0}
+                defaultValue={request.bedrooms ?? ""}
                 required
               />
             </label>
@@ -176,8 +205,17 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
             <textarea name="comments" defaultValue={request.comments} maxLength={4000} rows={3} />
           </label>
         </div>
+        <label className="check-field">
+          <input type="checkbox" name="territorial_reviewed" required />
+          {t(
+            "Verifiqué las direcciones completas y sus condados dentro de Florida.",
+            "I verified the full addresses and their counties within Florida.",
+          )}
+        </label>
         <ResultNotice result={state} />
-        <Button disabled={pending}>{t("Guardar información", "Save information")}</Button>
+        <Button disabled={pending}>
+          {t("Guardar datos y revisión del recorrido", "Save details and route review")}
+        </Button>
       </form>
     </details>
   );

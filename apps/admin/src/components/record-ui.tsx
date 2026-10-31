@@ -40,7 +40,6 @@ export function PageHeading({ es, en, subtitle }: { es: string; en: string; subt
   const { t } = useLanguage();
   return (
     <div className="page-heading">
-      <span className="eyebrow">LM RAPID TRANSPORT</span>
       <h1>{t(es, en)}</h1>
       {subtitle && <p className="muted">{t(...subtitle)}</p>}
     </div>
@@ -51,6 +50,10 @@ export const initialResult: FormResult = { error: "", success: false };
 export function ResultNotice({ result }: { result: FormResult }) {
   const { t } = useLanguage();
   const messages: Record<string, [string, string]> = {
+    ROUTE_REVIEW_REQUIRED: [
+      "Completa ambas direcciones y verifica los condados para confirmar, programar o aprobar por millas. La aprobación interna local permite direcciones pendientes.",
+      "Complete both addresses and verify counties to confirm, schedule or approve mileage pricing. Local internal approval allows pending addresses.",
+    ],
     CONFLICT: [
       "Otra persona cambió este registro. Recarga la página y revisa sus cambios antes de guardar.",
       "Someone changed this record. Reload the page and review their changes before saving.",
@@ -86,7 +89,7 @@ export function ResultNotice({ result }: { result: FormResult }) {
     );
   if (result.success)
     return (
-      <p className="notice" role="status">
+      <p className="notice success" role="status">
         {t("Cambios guardados.", "Changes saved.")}
       </p>
     );

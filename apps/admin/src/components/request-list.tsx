@@ -1,18 +1,25 @@
 "use client";
 import { requestStatuses } from "@lm/types";
 import { Button, EmptyState, useLanguage } from "@lm/ui";
+import { displayName } from "@lm/validation";
 import { DateText, PageHeading, Pagination, StatusBadge, statusLabels } from "./record-ui";
 export type RequestListRow = {
   id: string;
   request_number: string;
-  first_name: string;
-  last_name: string;
+  full_name?: string | null;
+  first_name: string | null;
+  last_name: string | null;
   phone: string;
   moving_date: string | null;
   status: string;
   created_at: string;
-  origin: { street: string; city: string };
-  destination: { street: string; city: string };
+  origin: { street: string | null; city: string | null; input?: string | null; postal_code?: string | null };
+  destination: {
+    street: string | null;
+    city: string | null;
+    input?: string | null;
+    postal_code?: string | null;
+  };
 };
 export function RequestTable({ rows }: { rows: RequestListRow[] }) {
   const { t } = useLanguage();
@@ -44,19 +51,17 @@ export function RequestTable({ rows }: { rows: RequestListRow[] }) {
                   {r.request_number}
                 </a>
               </td>
-              <td>
-                {r.first_name} {r.last_name}
-              </td>
+              <td>{displayName(r)}</td>
               <td>
                 <a href={`tel:${r.phone}`}>{r.phone}</a>
               </td>
               <td>
-                {r.origin.city}
-                <small className="cell-secondary">{r.origin.street}</small>
+                {r.origin.city ?? r.origin.postal_code ?? t("Por verificar", "Needs verification")}
+                <small className="cell-secondary">{r.origin.street ?? r.origin.input}</small>
               </td>
               <td>
-                {r.destination.city}
-                <small className="cell-secondary">{r.destination.street}</small>
+                {r.destination.city ?? r.destination.postal_code ?? t("Por verificar", "Needs verification")}
+                <small className="cell-secondary">{r.destination.street ?? r.destination.input}</small>
               </td>
               <td>
                 <DateText value={r.moving_date} />

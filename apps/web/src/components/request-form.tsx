@@ -1,21 +1,20 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button, useLanguage } from "@lm/ui";
-import { type RequestInput, requestSchema, validFileMetadata } from "@lm/validation";
+import { LocationField } from "@lm/ui/location-field";
+import {
+  moveSizes,
+  partialLocationSchema,
+  type IntakeV2 as RequestInput,
+  intakeV2Schema as requestSchema,
+  validFileMetadata,
+} from "@lm/validation";
 import { ArrowRight, Check, CheckCircle2, FileImage } from "lucide-react";
 import { useRef, useState } from "react";
 import { type FieldPath, useForm } from "react-hook-form";
 
-const address = {
-  street: "",
-  unit: "",
-  city: "",
-  state: "FL" as const,
-  postal_code: "",
-  country: "US" as const,
-};
 type Photo = { id: string; file: File; status: "pending" | "uploaded" | "failed" };
-export function RequestForm() {
+export function RequestForm({ phone }: { phone: string }) {
   const { t } = useLanguage();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -29,30 +28,38 @@ export function RequestForm() {
   const form = useForm<RequestInput>({
     resolver: zodResolver(requestSchema),
     defaultValues: {
-      first_name: "",
-      last_name: "",
+      version: 2,
+      full_name: "",
       phone: "",
       email: "",
-      origin: { ...address },
-      destination: { ...address },
+      origin: { input: "", resolution_token: null },
+      destination: { input: "", resolution_token: null },
       moving_date: null,
-      property_type: "HOUSE",
-      bedrooms: 1,
+      comments: "",
+      workers: null,
       property_size: null,
       size_unit: null,
-      origin_floor: 0,
-      destination_floor: 0,
-      origin_elevator: false,
-      destination_elevator: false,
-      workers: null,
-      comments: "",
+      property_type: null,
+      origin_floor: null,
+      destination_floor: null,
+      origin_elevator: null,
+      destination_elevator: null,
+      origin_unit: null,
+      destination_unit: null,
     },
   });
   const { errors } = form.formState;
-  void errors;
-  const property = form.watch("property_type");
+  form.watch(["origin", "destination"]);
   const hasSize = form.watch("property_size") !== null;
   const errorsText: Record<string, [string, string]> = {
+    INVALID_INPUT: [
+      "Revisa los campos indicados antes de continuar.",
+      "Check the highlighted fields before continuing.",
+    ],
+    SPAM_CHECK: [
+      "El autocompletado pudo rellenar un campo oculto. Recarga la página con las extensiones de autocompletado desactivadas e inténtalo de nuevo.",
+      "Autofill may have filled a hidden field. Reload with autofill extensions disabled and try again.",
+    ],
     PHONE_US: ["Introduce un teléfono válido de EE. UU.", "Enter a valid US phone number."],
     DATE_TOMORROW: ["Elige mañana o una fecha posterior.", "Choose tomorrow or a later date."],
     DATE_SUNDAY: ["No realizamos mudanzas los domingos.", "We don't schedule moves on Sundays."],
@@ -104,7 +111,12 @@ export function RequestForm() {
           aria-invalid={!!invalid}
           aria-describedby={invalid ? errorId : undefined}
           {...form.register(name, {
-            setValueAs: type === "number" ? (v) => (v === "" || v == null ? null : Number(v)) : undefined,
+            setValueAs:
+              type === "number"
+                ? (v) => (v === "" || v == null ? null : Number(v))
+                : type === "date"
+                  ? (v) => v || null
+                  : undefined,
           })}
         />
         {invalid && (
@@ -120,13 +132,11 @@ export function RequestForm() {
   async function advance() {
     const keys: FieldPath<RequestInput>[] =
       step === 0
-        ? ["first_name", "last_name", "phone", "email"]
+        ? ["origin", "destination"]
         : [
-            "origin",
-            "destination",
             "moving_date",
+            "move_size",
             "property_type",
-            "bedrooms",
             "property_size",
             "size_unit",
             "origin_floor",
@@ -135,12 +145,14 @@ export function RequestForm() {
             "destination_elevator",
             "workers",
             "comments",
+            "origin_unit",
+            "destination_unit",
           ];
     if (await form.trigger(keys, { shouldFocus: true })) {
       setStep(step + 1);
       setError("");
       setTimeout(() => heading.current?.focus(), 0);
-    }
+    } else setError("INVALID_INPUT");
   }
   async function api(path: string, body?: unknown, file?: File) {
     const response = await fetch(path, {
@@ -152,7 +164,10 @@ export function RequestForm() {
       body: file ?? (body ? JSON.stringify(body) : undefined),
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error ?? "UNAVAILABLE");
+    if (!response.ok) {
+      if (data.error === "INVALID_INPUT" && data.fields?.includes("website")) throw new Error("SPAM_CHECK");
+      throw new Error(data.error ?? "UNAVAILABLE");
+    }
     return data;
   }
   async function submit(data: RequestInput) {
@@ -234,11 +249,9 @@ export function RequestForm() {
         </div>
       </section>
     );
-  const values = form.getValues();
   return (
     <section className="section container form-container">
       <div className="request-intro">
-        <span className="eyebrow">{t("HAGAMOS EL PRIMER PASO", "LET'S TAKE THE FIRST STEP")}</span>
         <h1>{t("Cuéntanos de tu mudanza.", "Tell us about your move.")}</h1>
         <p className="lead">
           {t(
@@ -249,9 +262,9 @@ export function RequestForm() {
       </div>
       <ol className="form-steps">
         {[
-          ["Sobre ti", "About you"],
-          ["Tu mudanza", "Your move"],
-          ["Revisar y enviar", "Review and send"],
+          ["Ubicación", "Location"],
+          ["Detalles", "Details"],
+          ["Contacto", "Contact"],
         ].map(([es, en], i) => (
           <li key={es} aria-current={i === step ? "step" : undefined} className={i <= step ? "active" : ""}>
             <span>{i < step ? <Check size={18} /> : i + 1}</span>
@@ -273,195 +286,207 @@ export function RequestForm() {
       >
         <h2 ref={heading} tabIndex={-1}>
           {step === 0
-            ? t("Empecemos por conocerte.", "Let's start with you.")
+            ? t("¿De dónde a dónde?", "Where are you moving?")
             : step === 1
-              ? t("¿De dónde a dónde?", "Where are you moving?")
-              : t("Todo listo para revisar.", "Ready for a final look.")}
+              ? t("Cuéntanos lo básico.", "A few move details.")
+              : t("Recibe tu cotización.", "Get your quote.")}
         </h2>
         <div className="honeypot" aria-hidden="true">
           <label>
             Website
-            <input ref={website} tabIndex={-1} autoComplete="off" />
+            <input
+              ref={website}
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              readOnly
+              onFocus={(event) => {
+                event.currentTarget.readOnly = false;
+              }}
+              data-1p-ignore
+              data-lpignore="true"
+              data-bwignore
+            />
           </label>
         </div>
-        {step === 0 && (
-          <>
-            <p className="muted">
-              {t(
-                "Usaremos tu teléfono para conversar sobre la solicitud.",
-                "We'll use your phone number to discuss your request.",
-              )}
-            </p>
-            <div className="form-grid">
-              {field("first_name", "Nombre", "First name", { autoComplete: "given-name" })}
-              {field("last_name", "Apellido", "Last name", { autoComplete: "family-name" })}
-              {field("phone", "Teléfono de EE. UU.", "US phone number", { type: "tel", autoComplete: "tel" })}
-              {field("email", "Correo electrónico", "Email", {
+        <fieldset disabled={busy || begun} className="simple-form-fields">
+          {step === 0 && (
+            <div className="stack">
+              {(["origin", "destination"] as const).map((side) => (
+                <LocationField
+                  key={side}
+                  label={side === "origin" ? t("Origen", "Pickup") : t("Destino", "Destination")}
+                  value={form.getValues(side)}
+                  onChange={(value) => form.setValue(side, value, { shouldValidate: true })}
+                  invalid={
+                    !!errors[side] ||
+                    (error === "INVALID_INPUT" &&
+                      !partialLocationSchema.safeParse(form.getValues(side)).success)
+                  }
+                  disabled={busy || begun}
+                />
+              ))}
+              <p className="small muted">
+                {t(
+                  "Servicio dentro de Florida. Ambos extremos en Miami-Dade: por hora; fuera del condado: por milla. Confirmaremos el recorrido contigo.",
+                  "Service within Florida. Both locations in Miami-Dade: hourly; outside the county: per mile. We'll confirm the route with you.",
+                )}
+              </p>
+              <p className="small muted">
+                {t("La búsqueda usa Google Maps.", "Search uses Google Maps.")}{" "}
+                <a href="/privacy">{t("Privacidad", "Privacy")}</a> ·{" "}
+                <a href="/terms">{t("Condiciones", "Terms")}</a>
+              </p>
+            </div>
+          )}
+          {step === 1 && (
+            <div className="stack">
+              {field("moving_date", "Fecha deseada", "Preferred move date", {
+                type: "date",
+                optional: true,
+              })}
+              <p className="small muted">
+                {t(
+                  "Sin fecha definida: deja vacío. Desde mañana, lunes a sábado.",
+                  "No date yet: leave blank. Tomorrow or later, Monday–Saturday.",
+                )}
+              </p>
+              <label className="field">
+                {t("Tamaño de la mudanza", "Move size")}
+                <select
+                  {...form.register("move_size")}
+                  aria-invalid={!!form.getFieldState("move_size").error}
+                  defaultValue=""
+                >
+                  <option value="" disabled>
+                    {t("Selecciona el tamaño", "Select move size")}
+                  </option>
+                  {moveSizes.map((size) => (
+                    <option key={size} value={size}>
+                      {size === "STUDIO"
+                        ? t("Estudio", "Studio")
+                        : size === "OFFICE"
+                          ? t("Oficina", "Office")
+                          : size === "COMMERCIAL"
+                            ? t("Comercial", "Commercial")
+                            : size === "BEDROOMS_5_PLUS"
+                              ? t("5+ dormitorios", "5+ bedrooms")
+                              : size === "BEDROOMS_1"
+                                ? t("1 dormitorio", "1 bedroom")
+                                : size.slice(-1) + " " + t("dormitorios", "bedrooms")}
+                    </option>
+                  ))}
+                </select>
+                {form.getFieldState("move_size").error && (
+                  <span className="field-error">{t("Selecciona el tamaño.", "Select a move size.")}</span>
+                )}
+              </label>
+              <details>
+                <summary>{t("Más detalles (opcional)", "More details (optional)")}</summary>
+                <div className="stack" style={{ marginTop: 20 }}>
+                  <label className="field">
+                    {t("Tipo de propiedad", "Property type")}
+                    <select {...form.register("property_type", { setValueAs: (v) => v || null })}>
+                      <option value="">{t("Por definir", "Not specified")}</option>
+                      <option value="HOUSE">{t("Casa", "House")}</option>
+                      <option value="APARTMENT">{t("Apartamento", "Apartment")}</option>
+                      <option value="OFFICE">{t("Oficina", "Office")}</option>
+                      <option value="COMMERCIAL">{t("Comercial", "Commercial")}</option>
+                    </select>
+                  </label>
+                  {(["origin", "destination"] as const).map((side) => (
+                    <div key={side} className="stack">
+                      <h3>{side === "origin" ? t("Origen", "Pickup") : t("Destino", "Destination")}</h3>
+                      {field(
+                        (side + "_unit") as FieldPath<RequestInput>,
+                        "Unidad (opcional)",
+                        "Unit (optional)",
+                        { optional: true },
+                      )}
+                      {field(
+                        (side + "_floor") as FieldPath<RequestInput>,
+                        "Piso (opcional)",
+                        "Floor (optional)",
+                        { type: "number", optional: true, min: -5, max: 150 },
+                      )}
+                      <label className="field">
+                        {t("Elevador", "Elevator")}
+                        <select
+                          {...form.register(
+                            (side + "_elevator") as "origin_elevator" | "destination_elevator",
+                            { setValueAs: (v) => (v === "" || v == null ? null : v === "true") },
+                          )}
+                        >
+                          <option value="">{t("No indicado", "Not specified")}</option>
+                          <option value="true">{t("Sí", "Yes")}</option>
+                          <option value="false">No</option>
+                        </select>
+                      </label>
+                    </div>
+                  ))}
+                  <label className="field">
+                    {t("Superficie aproximada", "Approximate size")}
+                    <input
+                      type="number"
+                      min="1"
+                      max="1000000"
+                      {...form.register("property_size", { setValueAs: (v) => (v ? Number(v) : null) })}
+                      onChange={(e) => {
+                        const n = e.target.value ? Number(e.target.value) : null;
+                        form.setValue("property_size", n);
+                        form.setValue("size_unit", n ? (form.getValues("size_unit") ?? "SQFT") : null);
+                      }}
+                    />
+                  </label>
+                  {hasSize && (
+                    <label className="field">
+                      {t("Unidad", "Unit")}
+                      <select {...form.register("size_unit")}>
+                        <option value="SQFT">ft²</option>
+                        <option value="SQM">m²</option>
+                      </select>
+                    </label>
+                  )}
+                  <label className="field">
+                    {t("Equipo", "Crew")}
+                    <select {...form.register("workers", { setValueAs: (v) => (v ? Number(v) : null) })}>
+                      <option value="">{t("Necesito asesoría", "I need guidance")}</option>
+                      {[2, 3, 4].map((n) => (
+                        <option key={n} value={n}>
+                          {n} {t("trabajadores + camión", "movers + truck")}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    {t("Comentarios", "Comments")}
+                    <textarea rows={3} {...form.register("comments")} />
+                  </label>
+                </div>
+              </details>
+            </div>
+          )}
+          {step === 2 && (
+            <div className="stack">
+              {field("full_name", "Nombre completo", "Full name", { autoComplete: "name" })}
+              {field("email", "Correo electrónico", "Email address", {
                 type: "email",
                 optional: true,
                 autoComplete: "email",
               })}
-            </div>
-          </>
-        )}
-        {step === 1 && (
-          <div className="stack">
-            {(["origin", "destination"] as const).map((side) => (
-              <fieldset className="address-group" key={side}>
-                <legend>
-                  {side === "origin" ? t("Origen", "Origin") : t("Destino", "Destination")} · Florida
-                </legend>
-                <div className="form-grid">
-                  {field(`${side}.street`, "Dirección", "Street address")}
-                  {field(`${side}.unit`, "Apartamento / unidad", "Apartment / unit", { optional: true })}
-                  {field(`${side}.city`, "Ciudad", "City")}
-                  {field(`${side}.postal_code`, "Código postal", "ZIP code")}
-                  {field(`${side}_floor`, "Piso (0 = planta baja)", "Floor (0 = ground floor)", {
-                    type: "number",
-                    min: -5,
-                    max: 150,
-                  })}
-                  <label className="check-field">
-                    <input type="checkbox" {...form.register(`${side}_elevator`)} />
-                    {t("Hay elevador disponible", "Elevator available")}
-                  </label>
-                </div>
-              </fieldset>
-            ))}
-            <div className="form-grid">
-              <label className="field">
-                {t("Tipo de propiedad", "Property type")}
-                <select
-                  {...form.register("property_type")}
-                  onChange={(e) => {
-                    const value = e.target.value as RequestInput["property_type"];
-                    form.setValue("property_type", value);
-                    form.setValue("bedrooms", ["HOUSE", "APARTMENT"].includes(value) ? 1 : null);
-                  }}
-                >
-                  <option value="HOUSE">{t("Casa", "House")}</option>
-                  <option value="APARTMENT">{t("Apartamento", "Apartment")}</option>
-                  <option value="OFFICE">{t("Oficina", "Office")}</option>
-                  <option value="COMMERCIAL">{t("Local comercial", "Business premises")}</option>
-                </select>
-              </label>
-              {["HOUSE", "APARTMENT"].includes(property) &&
-                field("bedrooms", "Dormitorios (0 = estudio)", "Bedrooms (0 = studio)", {
-                  type: "number",
-                  min: 0,
-                  max: 20,
-                })}
-              <label className="field">
-                {t("Superficie aproximada (opcional)", "Approximate size (optional)")}
-                <input
-                  type="number"
-                  min="1"
-                  max="1000000"
-                  {...form.register("property_size", {
-                    setValueAs: (v) => (v === "" || v == null ? null : Number(v)),
-                  })}
-                  onChange={(e) => {
-                    const size = e.target.value ? Number(e.target.value) : null;
-                    form.setValue("property_size", size);
-                    form.setValue("size_unit", size ? (form.getValues("size_unit") ?? "SQFT") : null);
-                  }}
-                />
-                {form.getFieldState("property_size").error && (
-                  <span className="field-error">
-                    {t("Revisa la superficie y unidad.", "Check the size and unit.")}
-                  </span>
+              {field("phone", "Teléfono de EE. UU.", "US phone number", { type: "tel", autoComplete: "tel" })}
+              <p className="notice">
+                {t(
+                  "Esta solicitud no confirma una reserva ni un precio. Te contactaremos para completar los detalles.",
+                  "This request does not confirm a booking or price. We'll contact you to complete the details.",
                 )}
-              </label>
-              {hasSize && (
-                <label className="field">
-                  {t("Unidad", "Unit")}
-                  <select {...form.register("size_unit")}>
-                    <option value="SQFT">ft²</option>
-                    <option value="SQM">m²</option>
-                  </select>
-                </label>
-              )}
-              <label className="field">
-                {t("Equipo de trabajadores", "Moving crew")}
-                <select
-                  {...form.register("workers", {
-                    setValueAs: (v) => (v === "" || v == null ? null : Number(v)),
-                  })}
-                >
-                  <option value="">
-                    {t("No estoy seguro, necesito asesoría", "I'm not sure, I need guidance")}
-                  </option>
-                  {[2, 3, 4].map((n) => (
-                    <option key={n} value={n}>
-                      {n} {t("trabajadores + camión", "movers + truck")}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                {t("Fecha deseada (opcional)", "Preferred date (optional)")}
-                <input
-                  type="date"
-                  {...form.register("moving_date", { setValueAs: (v) => v || null })}
-                  aria-invalid={!!form.getFieldState("moving_date").error}
-                />
-                {form.getFieldState("moving_date").error && (
-                  <span className="field-error">
-                    {message(form.getFieldState("moving_date").error?.message ?? "")}
-                  </span>
-                )}
-                <span className="small muted">
-                  {t(
-                    "Sin fecha definida: deja vacío. Desde mañana, de lunes a sábado. La hora se acuerda después.",
-                    "No date yet: leave blank. Tomorrow or later, Monday–Saturday. The time is agreed later.",
-                  )}
-                </span>
-              </label>
-              <label className="field full">
-                {t("Comentarios adicionales (opcional)", "Additional comments (optional)")}
-                <textarea rows={4} maxLength={4000} {...form.register("comments")} />
-              </label>
+              </p>
             </div>
-          </div>
-        )}
-        {step === 2 && (
-          <div className="stack">
-            <dl className="review-grid">
-              <div>
-                <dt>{t("Contacto", "Contact")}</dt>
-                <dd>
-                  {values.first_name} {values.last_name}
-                  <br />
-                  {values.phone}
-                  {values.email && (
-                    <>
-                      <br />
-                      {values.email}
-                    </>
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt>{t("Fecha y equipo", "Date and crew")}</dt>
-                <dd>
-                  {values.moving_date ?? t("Todavía no tengo fecha definida", "I don't have a date yet")}
-                  <br />
-                  {values.workers
-                    ? `${values.workers} ${t("trabajadores + camión", "movers + truck")}`
-                    : t("Necesito asesoría", "I need guidance")}
-                </dd>
-              </div>
-              {(["origin", "destination"] as const).map((side) => (
-                <div key={side}>
-                  <dt>{side === "origin" ? t("Origen", "Origin") : t("Destino", "Destination")}</dt>
-                  <dd>
-                    {values[side].street} {values[side].unit}
-                    <br />
-                    {values[side].city}, FL {values[side].postal_code}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+          )}
+        </fieldset>
+        {(step === 1 || (step === 2 && begun && photos.length > 0)) && (
+          <details>
+            <summary>{t("Fotografías opcionales", "Optional photos")}</summary>{" "}
             <div className="upload-zone">
               <FileImage size={26} aria-hidden="true" />
               <h3>{t("Muéstranos tu espacio", "Show us your space")}</h3>
@@ -522,13 +547,7 @@ export function RequestForm() {
                 ))}
               </ul>
             )}
-            <p className="notice">
-              {t(
-                "Esta solicitud no confirma una reserva ni un precio. Revisaremos los detalles contigo antes de acordar una estimación y programación.",
-                "This request does not confirm a booking or a price. We'll review the details with you before agreeing on an estimate and schedule.",
-              )}
-            </p>
-          </div>
+          </details>
         )}
         {error && (
           <p className="notice error" role="alert">
@@ -567,10 +586,15 @@ export function RequestForm() {
                 ? t("Enviando…", "Sending…")
                 : error
                   ? t("Reintentar envío", "Retry submission")
-                  : t("Enviar solicitud", "Send request")}
+                  : t("Solicitar cotización", "Get my quote")}
             </Button>
           )}
         </div>
+        <p className="quote-phone">
+          {t("O habla directamente con nosotros:", "Or speak with us directly:")}
+          <br />
+          <a href={`tel:${phone}`}>{phone}</a>
+        </p>
       </form>
     </section>
   );

@@ -17,14 +17,14 @@ export default async function Page({
   let query = db
     .from("moving_requests")
     .select(
-      "id,request_number,first_name,last_name,phone,moving_date,status,created_at,origin:addresses!moving_requests_origin_id_fkey(street,city),destination:addresses!moving_requests_destination_id_fkey(street,city)",
+      "id,request_number,full_name,first_name,last_name,phone,moving_date,status,created_at,origin:addresses!moving_requests_origin_id_fkey(street,city,input,postal_code),destination:addresses!moving_requests_destination_id_fkey(street,city,input,postal_code)",
       { count: "exact" },
     )
     .order("created_at", { ascending: false })
     .range((page - 1) * 20, page * 20 - 1);
   if (q)
     query = query.or(
-      `request_number.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%,phone.ilike.%${q}%`,
+      `request_number.ilike.%${q}%,full_name.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%,phone.ilike.%${q}%`,
     );
   if (status) query = query.eq("status", status);
   if (from) query = query.gte("moving_date", from);

@@ -1,5 +1,5 @@
 "use server";
-import { appUrl } from "@lm/config/env";
+import { appUrl, supabaseEnvironment } from "@lm/config/env";
 import { privilegedClient } from "@lm/data/privileged";
 import { requireStaff, serverClient } from "@lm/data/server";
 import { revalidatePath } from "next/cache";
@@ -15,13 +15,9 @@ export async function login(_previous: { error: string }, data: FormData) {
   if (!parsed.success) return { error: "INVALID_LOGIN" };
   const db = await serverClient();
   const { data: auth, error } = await db.auth.signInWithPassword(parsed.data);
-  console.log("login", { auth, error });
+
   if (error || !auth.user) return { error: "INVALID_LOGIN" };
-  const { data: profile } = await db
-    .from("profiles")
-    .select("active")
-    .eq("id", auth.user.id)
-    .single();
+  const { data: profile } = await db.from("profiles").select("active").eq("id", auth.user.id).single();
   if (!profile?.active) {
     await db.auth.signOut();
     return { error: "INACTIVE" };
@@ -33,10 +29,7 @@ export async function logout() {
   await db.auth.signOut();
   redirect("/login");
 }
-export async function recover(
-  _previous: { error: string; success: boolean },
-  data: FormData,
-) {
+export async function recover(_previous: { error: string; success: boolean }, data: FormData) {
   const parsed = z.email().safeParse(data.get("email"));
   if (!parsed.success) return { error: "INVALID_EMAIL", success: false };
   const db = await serverClient();
@@ -45,13 +38,9 @@ export async function recover(
   });
   return { error: "", success: true };
 }
-export async function setPassword(
-  _previous: { error: string },
-  data: FormData,
-) {
+export async function setPassword(_previous: { error: string }, data: FormData) {
   const parsed = z.string().min(12).max(128).safeParse(data.get("password"));
-  if (!parsed.success || data.get("password") !== data.get("confirm"))
-    return { error: "PASSWORD_RULES" };
+  if (!parsed.success || data.get("password") !== data.get("confirm")) return { error: "PASSWORD_RULES" };
   const db = await serverClient();
   const {
     data: { user },
@@ -61,10 +50,8 @@ export async function setPassword(
   if (error) return { error: "PASSWORD_RULES" };
   redirect("/dashboard");
 }
-export async function invite(
-  _previous: { error: string; success: boolean },
-  data: FormData,
-) {
+
+export async function invite(_previous: { error: string; success: boolean }, data: FormData) {
   const { db } = await requireStaff("users.manage");
   const parsed = z
     .object({
@@ -73,40 +60,63 @@ export async function invite(
     })
     .safeParse(Object.fromEntries(data));
   if (!parsed.success) return { error: "INVALID_INPUT", success: false };
-  const { error } = await db.rpc("reserve_staff_invite", {
+  const { data: operation, error } = await db.rpc("begin_staff_email", {
     p_email: parsed.data.email,
     p_role: parsed.data.role,
   });
-  if (error) {
-    if (!error.message.includes("USER_EXISTS"))
-      return { error: "FORBIDDEN", success: false };
-    const { data: pendingId, error: pendingError } = await db.rpc(
-      "pending_staff_invitation",
-      {
-        p_email: parsed.data.email,
-        p_role: parsed.data.role,
-      },
-    );
-    if (pendingError || !pendingId)
-      return { error: "USER_EXISTS", success: false };
-    const { error: recoveryError } = await db.auth.resetPasswordForEmail(
-      parsed.data.email,
-      {
-        redirectTo: `${appUrl("admin")}/auth/set-password`,
-      },
-    );
+  if (error)
     return {
-      error: recoveryError ? "INVITE_FAILED" : "",
-      success: !recoveryError,
+      error:
+        ["INVITE_RATE_LIMITED", "USER_EXISTS", "FORBIDDEN", "INVALID_INPUT"].find((code) =>
+          error.message.includes(code),
+        ) ?? "INVITE_FAILED",
+      success: false,
     };
-  }
-  const { error: inviteError } =
-    await privilegedClient().auth.admin.inviteUserByEmail(parsed.data.email, {
-      redirectTo: `${appUrl("admin")}/auth/set-password`,
+  const attempt = z.object({ operation_id: z.uuid(), pending_id: z.uuid().nullable() }).safeParse(operation);
+  if (!attempt.success) return { error: "INVITE_FAILED", success: false };
+  try {
+    const type = attempt.data.pending_id ? "recovery" : "invite";
+    const { data: link, error: linkError } = await privilegedClient().auth.admin.generateLink({
+      type,
+      email: parsed.data.email.trim().toLowerCase(),
+      options: { redirectTo: `${appUrl("admin")}/auth/set-password` },
     });
-  if (inviteError) return { error: "INVITE_FAILED", success: false };
-  revalidatePath("/users");
-  return { error: "", success: true };
+    if (linkError || !link.properties?.hashed_token) return { error: "INVITE_FAILED", success: false };
+    // Use the existing SSR callback, not an implicit-flow URL with session fragments.
+    const actionUrl = new URL("/auth/confirm", appUrl("admin"));
+    actionUrl.searchParams.set("token_hash", link.properties.hashed_token);
+    actionUrl.searchParams.set("type", type);
+    const secret = process.env.SUPABASE_SECRET_KEY;
+    console.log("SUPABASE_SECRET_KEY", secret);
+    if (!secret) return { error: "MAIL_CONFIGURATION", success: false };
+    console.log("URL function", new URL("/functions/v1/resend", supabaseEnvironment().url).toString())
+    const result = await fetch(new URL("/functions/v1/resend", supabaseEnvironment().url), {
+      method: "POST",
+      headers: { apikey: secret, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: parsed.data.email.trim().toLowerCase(),
+        action_url: actionUrl.toString(),
+        operation_id: attempt.data.operation_id,
+      }),
+      signal: AbortSignal.timeout(25000),
+    });
+    console.log("resend result", result.status, result.statusText);
+    const receipt = await result.json();
+
+    revalidatePath("/users");
+    if (!result.ok || receipt.accepted !== true || typeof receipt.id !== "string") {
+      return {
+        error: ["MAIL_CONFIGURATION", "MAIL_RATE_LIMITED", "MAIL_API_KEY_INVALID", "MAIL_DOMAIN_UNVERIFIED", "MAIL_TEST_RECIPIENT_ONLY"].includes(receipt.error)
+          ? receipt.error
+          : "INVITE_FAILED",
+        success: false,
+      };
+    }
+    return { error: "", success: true };
+  } catch {
+    revalidatePath("/users");
+    return { error: "INVITE_FAILED", success: false };
+  }
 }
 export async function setActive(data: FormData) {
   const { db } = await requireStaff("users.manage");
@@ -117,9 +127,6 @@ export async function setActive(data: FormData) {
     p_id: parsed.id,
     p_active: parsed.active === "true",
   });
-  if (error)
-    throw new Error(
-      error.message.includes("LAST_ADMIN") ? "LAST_ADMIN" : "FORBIDDEN",
-    );
+  if (error) throw new Error(error.message.includes("LAST_ADMIN") ? "LAST_ADMIN" : "FORBIDDEN");
   revalidatePath("/users");
 }

@@ -13,7 +13,7 @@ export default async function Page({
   let query = db
     .from("moves")
     .select(
-      "id,status,scheduled_at,request:moving_requests!moves_request_id_fkey(request_number,first_name,last_name,phone),origin:addresses!moves_origin_id_fkey(city),destination:addresses!moves_destination_id_fkey(city)",
+      "id,status,scheduled_at,request:moving_requests!moves_request_id_fkey(request_number,full_name,first_name,last_name,phone),origin:addresses!moves_origin_id_fkey(city),destination:addresses!moves_destination_id_fkey(city)",
       { count: "exact" },
     )
     .order("scheduled_at", { ascending: false })
