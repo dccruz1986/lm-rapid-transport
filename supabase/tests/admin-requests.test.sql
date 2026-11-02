@@ -1,0 +1,53 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select no_plan();
+insert into auth.users(id,email) values
+('91000000-0000-4000-8000-000000000001','manual-admin@example.test'),
+('91000000-0000-4000-8000-000000000002','manual-manager@example.test'),
+('91000000-0000-4000-8000-000000000003','manual-dispatcher@example.test');
+update public.profiles set active=true,role=case id when '91000000-0000-4000-8000-000000000001' then 'ADMIN' when '91000000-0000-4000-8000-000000000002' then 'MANAGER' else 'DISPATCHER' end
+where id::text like '91000000-%';
+select set_config('test.manual_payload','{"full_name":"Manual fixture","phone":"+13055550198","email":null,"origin":"33147","destination":"33016","move_size":"BEDROOMS_5_PLUS","moving_date":null,"comments":"Synthetic fixture"}',true);
+select ok(not has_function_privilege('anon','public.create_request(uuid,jsonb)','EXECUTE'),'Anonymous cannot create');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','91000000-0000-4000-8000-000000000001',true);
+select lives_ok($$select public.create_request('91000000-0000-4000-8000-000000000011',current_setting('test.manual_payload')::jsonb)$$,'Admin creates');
+select set_config('test.manual_result',public.create_request('91000000-0000-4000-8000-000000000011',current_setting('test.manual_payload')::jsonb)::text,true);
+select is(public.create_request('91000000-0000-4000-8000-000000000011',current_setting('test.manual_payload')::jsonb),current_setting('test.manual_result')::jsonb,'Retry returns same receipt');
+select throws_ok($$select public.create_request('91000000-0000-4000-8000-000000000011',current_setting('test.manual_payload')::jsonb||'{"full_name":"Changed"}')$$,'P0001','CONFLICT','Changed payload conflicts');
+select set_config('request.jwt.claim.sub','91000000-0000-4000-8000-000000000002',true);
+select lives_ok($$select public.create_request('91000000-0000-4000-8000-000000000012',current_setting('test.manual_payload')::jsonb||'{"full_name":"Different name"}')$$,'Manager creates');
+select set_config('request.jwt.claim.sub','91000000-0000-4000-8000-000000000003',true);
+select lives_ok($$select public.create_request('91000000-0000-4000-8000-000000000013',current_setting('test.manual_payload')::jsonb)$$,'Dispatcher creates');
+select is((select count(*) from public.customers where phone='+13055550198'),1::bigint,'One customer for shared phone');
+select is((select full_name from public.customers where phone='+13055550198'),'Manual fixture','Existing customer preserved');
+select is((select count(*) from public.moving_requests where phone='+13055550198'),3::bigint,'Distinct operations create three requests');
+select ok((select bool_and(status='NEW' and not territorial_reviewed and suggested_mode is null and bedrooms is null) from public.moving_requests where phone='+13055550198'),'New and unreviewed without invented room count');
+select ok((select bool_and(a.street is null and a.city is null and a.precision='MANUAL' and a.postal_code='33147') from public.addresses a join public.moving_requests r on r.origin_id=a.id where r.phone='+13055550198'),'ZIP preserved without fake street');
+select throws_ok($$select public.create_request(gen_random_uuid(),current_setting('test.manual_payload')::jsonb||'{"origin":""}')$$,'P0001','INVALID_INPUT','Invalid location rejected');
+select throws_ok($$select public.create_request(gen_random_uuid(),current_setting('test.manual_payload')::jsonb||jsonb_build_object('moving_date',(now() at time zone 'America/New_York')::date::text))$$,'P0001','INVALID_DATE','Today rejected');
+select throws_ok($$select public.create_request(gen_random_uuid(),current_setting('test.manual_payload')::jsonb||'{"email":"invalid"}')$$,'P0001','INVALID_INPUT','Invalid email rejected');
+reset role;
+create function pg_temp.fail_manual_insert() returns trigger language plpgsql as $$ begin raise exception 'TEST_FAILURE'; end $$;
+create trigger test_manual_failure before insert on public.moving_requests for each row execute function pg_temp.fail_manual_insert();
+select set_config('test.address_count',(select count(*)::text from public.addresses),true);
+select set_config('request.jwt.claim.sub','91000000-0000-4000-8000-000000000001',true);
+set local role authenticated;
+select throws_ok($$select public.create_request(gen_random_uuid(),current_setting('test.manual_payload')::jsonb||'{"phone":"+13055550194"}')$$,'P0001','TEST_FAILURE','Failure after customer and addresses rolls back');
+reset role;
+drop trigger test_manual_failure on public.moving_requests;
+select is((select count(*) from public.addresses),current_setting('test.address_count')::bigint,'No partial addresses after failure');
+select is((select count(*) from public.customers where phone='+13055550194'),0::bigint,'No partial customer after failure');
+select set_config('request.jwt.claim.sub','91000000-0000-4000-8000-000000000003',true);
+update public.profiles set active=false where id='91000000-0000-4000-8000-000000000003';
+set local role authenticated;
+select throws_ok($$select public.create_request('91000000-0000-4000-8000-000000000013',current_setting('test.manual_payload')::jsonb)$$,'42501','FORBIDDEN','Inactive user cannot replay own receipt');
+reset role;
+update public.profiles set active=true where id='91000000-0000-4000-8000-000000000003';
+delete from private.role_permissions where role='DISPATCHER' and action='requests.create';
+set local role authenticated;
+select throws_ok($$select public.create_request(gen_random_uuid(),current_setting('test.manual_payload')::jsonb)$$,'42501','FORBIDDEN','Revoked permission enforced');
+reset role;
+select is((select count(*) from private.request_creations where actor::text like '91000000-%'),3::bigint,'Only successful operations are recorded');
+select * from finish();
+rollback;

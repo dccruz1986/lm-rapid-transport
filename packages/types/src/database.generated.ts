@@ -274,6 +274,7 @@ isOneToOne: true
           }
           Functions: {
             "begin_staff_email": { Args: { p_email: string; p_role: string }; Returns: Json },
+            "create_request": { Args: { p_key: string; p_data: Json }; Returns: Json },
             "approve_quote":
 { Args: { "p_request": string,"p_version": number }; Returns: undefined
                            },

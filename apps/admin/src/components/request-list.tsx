@@ -2,6 +2,7 @@
 import { requestStatuses } from "@lm/types";
 import { Button, EmptyState, useLanguage } from "@lm/ui";
 import { displayName } from "@lm/validation";
+import Link from "next/link";
 import { DateText, PageHeading, Pagination, StatusBadge, statusLabels } from "./record-ui";
 export type RequestListRow = {
   id: string;
@@ -80,11 +81,13 @@ export function RequestTable({ rows }: { rows: RequestListRow[] }) {
   );
 }
 export function RequestList({
+  canCreate = false,
   rows,
   total,
   page,
   filters,
 }: {
+  canCreate?: boolean;
   rows: RequestListRow[];
   total: number;
   page: number;
@@ -101,6 +104,13 @@ export function RequestList({
           "Every next beginning, organized in one place.",
         ]}
       />
+      {canCreate && (
+        <div>
+          <Button asChild>
+            <Link href="/requests/new">{t("Nueva solicitud", "New request")}</Link>
+          </Button>
+        </div>
+      )}
       <form className="filter-bar">
         <label className="field">
           {t("Buscar", "Search")}
