@@ -112,7 +112,7 @@ export async function editRequest(_previous: FormResult, form: FormData): Promis
     workers: optionalNumber("workers"),
     comments: text("comments"),
   });
-  if (!id.success || !parsed.success) return { error: "INVALID_INPUT", success: false };
+  if (!id.success || !parsed.success) return { error: `INVALID_INPUT ${parsed.error}`, success: false };
   const { db } = await requireStaff("requests.edit");
   const { error } = await db.rpc("edit_request", {
     p_id: id.data.id,

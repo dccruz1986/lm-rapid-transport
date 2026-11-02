@@ -13,11 +13,13 @@ export function LocationField({
   invalid,
   disabled,
   onPlaceSelect,
+  onPlaceInvalid,
 }: {
   label: string;
   value: LocationValue;
   onChange: (v: LocationValue) => void;
   onPlaceSelect?: (position: google.maps.LatLngLiteral, address: SelectedLocation) => void;
+  onPlaceInvalid?: () => void;
   invalid: boolean;
   disabled: boolean;
 }) {
@@ -126,6 +128,7 @@ export function LocationField({
           !components.some((c) => c.types.includes("administrative_area_level_1") && c.shortText === "FL") ||
           !place.location
         ) {
+          onPlaceInvalid?.();
           setMessage(
             t(
               "Selecciona una ubicación válida dentro de Florida.",
