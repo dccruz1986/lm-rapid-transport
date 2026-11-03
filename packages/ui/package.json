@@ -5,6 +5,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./google-places": "./src/google-places.ts",
+    "./resolve-location": "./src/resolve-location.ts",
     "./styles.css": "./src/styles.css",
     "./*": "./src/*.tsx"
   },

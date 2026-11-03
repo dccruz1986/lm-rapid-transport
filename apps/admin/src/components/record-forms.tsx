@@ -96,7 +96,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
               disabled={pending}
             />
             <div className="form-grid">
-              {(["street", "city", "postal_code"] as const).map((name) => (
+              {(["street", "city", "postal_code", "place_id", "precision"] as const).map((name) => (
                 <input
                   key={name}
                   type="hidden"

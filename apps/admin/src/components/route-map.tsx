@@ -2,7 +2,7 @@
 "use client";
 import { importLibrary } from "@googlemaps/js-api-loader";
 import { Button, useLanguage } from "@lm/ui";
-import { configureGoogleMaps, loadPlaces, withLocationTimeout } from "@lm/ui/google-places";
+import { configureGoogleMaps, withLocationTimeout } from "@lm/ui/google-places";
 import { LocationField } from "@lm/ui/location-field";
 import { useEffect, useRef, useState } from "react";
 
@@ -10,52 +10,23 @@ import { useRouteAddresses } from "./route-addresses";
 
 const MIAMI = { lat: 25.7617, lng: -80.1918 };
 
-// Preview only: a ZIP centroid never confirms an address or county.
-async function locateZip(zip: string) {
-  if (!/^\d{5}$/.test(zip)) return null;
-  const places = await loadPlaces();
-  const { suggestions } = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
-    input: zip,
-    includedPrimaryTypes: ["postal_code"],
-    includedRegionCodes: ["us"],
-  });
-  const prediction = suggestions[0]?.placePrediction;
-  if (!prediction) return null;
-  const place = prediction.toPlace();
-  await place.fetchFields({ fields: ["addressComponents", "location"] });
-  const matches = (type: string, value: string) =>
-    (place.addressComponents ?? []).some((c) => c.types.includes(type) && c.shortText === value);
-  return matches("postal_code", zip) &&
-    matches("country", "US") &&
-    matches("administrative_area_level_1", "FL") &&
-    place.location
-    ? place.location.toJSON()
-    : null;
-}
-
-export function RouteMap({
-  originZip,
-  destinationZip,
-}: {
+export function RouteMap(_props: {
   origin: string;
   destination: string;
   originZip?: string | null;
   destinationZip?: string | null;
 }) {
   const { t, locale } = useLanguage();
-  const { addresses, positions, setPositions, edits, edit, select } = useRouteAddresses();
+  const { addresses, positions, statuses, edit, select, retryLocations } = useRouteAddresses();
   const inputs = addresses.map((address) => address.input);
 
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [searching, setSearching] = useState(false);
+  const searching = statuses.includes("loading");
   const [retry, setRetry] = useState(0);
   const element = useRef<HTMLElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const markers = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
-
-  // Share pending lookups across React Strict Mode effect replays.
-  const zipLookups = useRef(new Map<string, Promise<google.maps.LatLngLiteral | null>>());
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: retry explicitly restarts failed Google requests.
   useEffect(() => {
@@ -89,33 +60,6 @@ export function RouteMap({
       setReady(false);
     };
   }, [retry]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: retry explicitly restarts failed Google requests.
-  useEffect(() => {
-    let active = true;
-    const versions = [...edits.current];
-    setSearching(true);
-    void Promise.allSettled(
-      [originZip, destinationZip].map(async (zip, i) => {
-        if (!zip || edits.current[i] !== 0) return;
-        const normalizedZip = zip.trim();
-        let lookup = zipLookups.current.get(normalizedZip);
-        if (!lookup) {
-          lookup = withLocationTimeout(locateZip(normalizedZip));
-          zipLookups.current.set(normalizedZip, lookup);
-          void lookup.catch(() => zipLookups.current.delete(normalizedZip));
-        }
-        const position = await lookup;
-        if (active && versions[i] === edits.current[i])
-          setPositions((values) => values.map((old, n) => (n === i ? position : old)));
-      }),
-    ).finally(() => {
-      if (active) setSearching(false);
-    });
-    return () => {
-      active = false;
-    };
-  }, [originZip, destinationZip, retry]);
 
   useEffect(() => {
     if (!ready || !map.current) return;
@@ -174,10 +118,29 @@ export function RouteMap({
       </div>
       <p className="small muted">
         {t(
-          "El mapa muestra Miami por defecto. Los ZIP de la solicitud se ubican automáticamente como puntos aproximados; selecciona una sugerencia para precisar cada ubicación. A: origen · B: destino.",
-          "The map defaults to Miami. Request ZIP codes are located automatically as approximate points; select a suggestion to refine each location. A: origin · B: destination.",
+          "Las ubicaciones guardadas se recuperan automáticamente. A: origen · B: destino. Los puntos por ZIP son aproximados; sin puntos se muestra Miami.",
+          "Saved locations are restored automatically. A: pickup · B: destination. ZIP points are approximate; without points the map shows Miami.",
         )}
       </p>
+      <div className="small muted">
+        {statuses.map((status, i) => (
+          <p key={i === 0 ? "origin" : "destination"}>
+            {i === 0 ? "A" : "B"}:{" "}
+            {status === "address"
+              ? t("Dirección recuperada", "Address restored")
+              : status === "postal"
+                ? t("ZIP aproximado", "Approximate ZIP")
+                : status === "loading"
+                  ? t("Recuperando…", "Restoring…")
+                  : status === "error"
+                    ? t(
+                        "No se pudo resolver; reintenta o selecciona una ubicación.",
+                        "Could not resolve; retry or select a location.",
+                      )
+                    : t("Pendiente de selección", "Selection pending")}
+          </p>
+        ))}
+      </div>
       <p className="small muted">
         {t(
           "Vista de consulta. Para guardar cambios utiliza el paso 1: Datos del cliente y direcciones. El mapa no calcula el precio ni confirma el condado o la dirección exacta.",
@@ -191,7 +154,7 @@ export function RouteMap({
               "Google Maps could not load. Check the public key and its permissions.",
             )
           : searching
-            ? t("Ubicando los ZIP…", "Locating ZIP codes…")
+            ? t("Recuperando ubicaciones…", "Restoring locations…")
             : positions.every(Boolean)
               ? t(
                   "Los dos puntos están visibles. Las ubicaciones por ZIP son aproximadas.",
@@ -202,8 +165,14 @@ export function RouteMap({
                   "Select missing locations from the suggestions. Without points, Miami is shown.",
                 )}
       </p>
-      {failed && (
-        <Button type="button" onClick={() => setRetry((value) => value + 1)}>
+      {(failed || statuses.includes("error")) && (
+        <Button
+          type="button"
+          onClick={() => {
+            retryLocations();
+            if (failed) setRetry((value) => value + 1);
+          }}
+        >
           {t("Reintentar", "Retry")}
         </Button>
       )}

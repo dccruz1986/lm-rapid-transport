@@ -5,7 +5,14 @@ import { useLanguage } from "./language";
 
 type Suggestion = { id: string; label: string; prediction: google.maps.places.PlacePrediction };
 export type LocationValue = { input: string; resolution_token: string | null };
-export type SelectedLocation = { label: string; street: string; city: string; postal_code: string };
+export type SelectedLocation = {
+  label: string;
+  street: string;
+  city: string;
+  postal_code: string;
+  place_id: string;
+  precision: "ADDRESS" | "POSTAL_CODE";
+};
 export function LocationField({
   label,
   value,
@@ -140,6 +147,8 @@ export function LocationField({
         setSelectedInput(value.input);
         const component = (type: string) => components.find((c) => c.types.includes(type))?.longText ?? "";
         onPlaceSelect(place.location.toJSON(), {
+          place_id: item.id,
+          precision: component("street_number") ? "ADDRESS" : "POSTAL_CODE",
           label: item.label,
           street: [component("street_number"), component("route")].filter(Boolean).join(" "),
           city: component("locality") || component("sublocality_level_1"),

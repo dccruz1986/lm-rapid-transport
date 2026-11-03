@@ -5,6 +5,10 @@ import { useActionState } from "react";
 import { login, recover, setPassword } from "@/app/auth/actions";
 
 const messages: Record<string, [string, string]> = {
+  AUTH_UNAVAILABLE: [
+    "El servicio de acceso no está disponible temporalmente. Inténtalo de nuevo en un momento.",
+    "The sign-in service is temporarily unavailable. Please try again shortly.",
+  ],
   INVALID_LOGIN: ["Correo o contraseña incorrectos.", "Incorrect email or password."],
   INACTIVE: [
     "Tu cuenta no tiene acceso activo. Contacta al administrador.",
