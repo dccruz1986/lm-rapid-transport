@@ -75,6 +75,14 @@ export const operationalEditSchema = requestBaseSchema
   .omit({ first_name: true, last_name: true })
   .extend({
     full_name: fullContactSchema.shape.full_name,
+    origin: requestBaseSchema.shape.origin.extend({
+      place_id: z.string().max(300).nullable().optional(),
+      precision: z.enum(["ADDRESS", "POSTAL_CODE", "MANUAL"]).optional(),
+    }),
+    destination: requestBaseSchema.shape.destination.extend({
+      place_id: z.string().max(300).nullable().optional(),
+      precision: z.enum(["ADDRESS", "POSTAL_CODE", "MANUAL"]).optional(),
+    }),
     property_type: requestBaseSchema.shape.property_type.nullable(),
     origin_floor: requestBaseSchema.shape.origin_floor.nullable(),
     destination_floor: requestBaseSchema.shape.destination_floor.nullable(),

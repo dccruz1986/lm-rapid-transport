@@ -32,10 +32,7 @@ export function RequestDetail({
     COMMERCIAL: ["Comercio", "Business"],
   };
   return (
-    <RouteAddressesProvider
-      key={JSON.stringify([request.id, request.origin, request.destination])}
-      request={request}
-    >
+    <RouteAddressesProvider key={request.id} request={request}>
       <div className="stack">
         <div className="page-heading">
           <a href="/requests" className="small">
@@ -141,7 +138,7 @@ export function RequestDetail({
           </section>
         </div>
         <RouteMap
-          key={JSON.stringify([request.id, request.origin, request.destination])}
+          key={request.id}
           originZip={request.origin.postal_code}
           destinationZip={request.destination.postal_code}
           origin={[

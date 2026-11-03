@@ -89,6 +89,9 @@ export async function editRequest(_previous: FormResult, form: FormData): Promis
     state: "FL",
     postal_code: text(`${key}.postal_code`),
     country: "US",
+    ...(form.has(`${key}.place_id`)
+      ? { place_id: text(`${key}.place_id`) || null, precision: text(`${key}.precision`) || "MANUAL" }
+      : {}),
   });
   const parsed = operationalEditSchema.safeParse({
     full_name: text("full_name"),

@@ -1,6 +1,6 @@
 "use client";
 import { Button, useLanguage } from "@lm/ui";
-import { LocationField } from "@lm/ui/location-field";
+import { LocationField, type SelectedLocation } from "@lm/ui/location-field";
 import { adminRequestSchema, moveSizes } from "@lm/validation";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -28,6 +28,10 @@ export function NewRequestForm() {
   const [fields, setFields] = useState<string[]>([]);
   const [unknownDate, setUnknownDate] = useState(false);
   const [locations, setLocations] = useState({ origin: "", destination: "" });
+  const [selected, setSelected] = useState<{
+    origin: SelectedLocation | null;
+    destination: SelectedLocation | null;
+  }>({ origin: null, destination: null });
   const [invalidPlaces, setInvalidPlaces] = useState({ origin: false, destination: false });
   const fieldError = (name: string) =>
     fields.includes(name) ? <small role="alert">{t("Revisa este campo.", "Check this field.")}</small> : null;
@@ -54,6 +58,8 @@ export function NewRequestForm() {
             phone: form.get("phone"),
             email: form.get("email"),
             ...locations,
+            origin_location: selected.origin,
+            destination_location: selected.destination,
             move_size: form.get("move_size"),
             moving_date: unknownDate ? null : form.get("moving_date"),
             comments: form.get("comments"),
@@ -138,11 +144,13 @@ export function NewRequestForm() {
               invalid={fields.includes(side) || invalidPlaces[side]}
               disabled={busy}
               onChange={(value) => {
+                setSelected((previous) => ({ ...previous, [side]: null }));
                 setLocations((previous) => ({ ...previous, [side]: value.input }));
                 setInvalidPlaces((previous) => ({ ...previous, [side]: false }));
               }}
               onPlaceInvalid={() => setInvalidPlaces((previous) => ({ ...previous, [side]: true }))}
               onPlaceSelect={(_position, address) => {
+                setSelected((previous) => ({ ...previous, [side]: address }));
                 setLocations((previous) => ({ ...previous, [side]: address.label }));
                 setInvalidPlaces((previous) => ({ ...previous, [side]: false }));
               }}

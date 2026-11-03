@@ -16,6 +16,8 @@ export async function login(_previous: { error: string }, data: FormData) {
   const db = await serverClient();
   const { data: auth, error } = await db.auth.signInWithPassword(parsed.data);
 
+  if (error && (error.status === 0 || (error.status ?? 0) >= 500 || error.name === "AuthRetryableFetchError"))
+    return { error: "AUTH_UNAVAILABLE" };
   if (error || !auth.user) return { error: "INVALID_LOGIN" };
   const { data: profile } = await db.from("profiles").select("active").eq("id", auth.user.id).single();
   if (!profile?.active) {
@@ -87,7 +89,6 @@ export async function invite(_previous: { error: string; success: boolean }, dat
     actionUrl.searchParams.set("token_hash", link.properties.hashed_token);
     actionUrl.searchParams.set("type", type);
     const secret = process.env.SUPABASE_SECRET_KEY;
-    console.log("SUPABASE_SECRET_KEY", secret);
     if (!secret) return { error: "MAIL_CONFIGURATION", success: false };
     console.log("URL function", new URL("/functions/v1/resend", supabaseEnvironment().url).toString())
     const result = await fetch(new URL("/functions/v1/resend", supabaseEnvironment().url), {
