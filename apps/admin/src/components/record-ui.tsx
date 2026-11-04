@@ -50,6 +50,30 @@ export const initialResult: FormResult = { error: "", success: false };
 export function ResultNotice({ result }: { result: FormResult }) {
   const { t } = useLanguage();
   const messages: Record<string, [string, string]> = {
+    MOVE_START_REQUIRED: [
+      "Introduce la fecha y hora de llegada al origen.",
+      "Enter the arrival date and time.",
+    ],
+    MOVE_START_INVALID: [
+      "Revisa la llegada y su zona horaria; no puede estar en el futuro.",
+      "Check the arrival and time zone; it cannot be in the future.",
+    ],
+    MOVE_END_REQUIRED: [
+      "Introduce la fecha y hora de descarga finalizada para completar.",
+      "Enter the unloading finish date and time to complete the move.",
+    ],
+    MOVE_END_INVALID: [
+      "Revisa la finalización y su zona horaria: debe ser posterior a la llegada, no futura y dentro de 168 horas.",
+      "Check the finish and time zone: it must be after arrival, not in the future, and within 168 hours.",
+    ],
+    MOVE_MILES_REQUIRED: [
+      "Introduce las millas reales de ida para completar.",
+      "Enter actual one-way miles to complete the move.",
+    ],
+    MOVE_MILES_INVALID: [
+      "Introduce millas mayores que cero, hasta 10000 y con un máximo de cuatro decimales; solo aplican a mudanzas por milla.",
+      "Enter miles above zero, up to 10000, with at most four decimal places; only mileage moves accept miles.",
+    ],
     ROUTE_REVIEW_REQUIRED: [
       "Completa ambas direcciones y verifica los condados para confirmar, programar o aprobar por millas. La aprobación interna local permite direcciones pendientes.",
       "Complete both addresses and verify counties to confirm, schedule or approve mileage pricing. Local internal approval allows pending addresses.",
