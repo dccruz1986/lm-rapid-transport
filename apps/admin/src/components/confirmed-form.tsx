@@ -8,12 +8,14 @@ export function ConfirmedForm({
   values,
   question,
   className = "stack",
+  validate,
 }: {
   action: (form: FormData) => void;
   children: ReactNode;
   values: string[];
   question: string;
   className?: string;
+  validate?: (data: FormData, action: string) => boolean;
 }) {
   const { t } = useLanguage();
   const form = useRef<HTMLFormElement>(null);
@@ -28,6 +30,11 @@ export function ConfirmedForm({
       className={className}
       onSubmit={(event) => {
         const button = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+        if (validate && !validate(new FormData(event.currentTarget), button?.value ?? "")) {
+          event.preventDefault();
+          approved.current = false;
+          return;
+        }
         if (approved.current) {
           approved.current = false;
           return;

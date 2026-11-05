@@ -1,7 +1,14 @@
 "use client";
 import type { Database } from "@lm/types/database";
 import { Button, useLanguage } from "@lm/ui";
-import { calculateTotal, dollarsToCents, miamiLocalTime, miamiOffset } from "@lm/validation";
+import {
+  calculateTotal,
+  dollarsToCents,
+  miamiInstant,
+  miamiLocalTime,
+  miamiOffset,
+  validateMeasurements,
+} from "@lm/validation";
 import { useActionState, useState } from "react";
 import {
   communicateQuote,
@@ -81,6 +88,8 @@ function TimeField({
   required?: boolean;
 }) {
   const { t } = useLanguage();
+  const [local, setLocal] = useState(value ? miamiLocalTime(value) : "");
+  const [offset, setOffset] = useState(value ? miamiOffset(value) : "-04:00");
   return (
     <div className="form-grid">
       <label className="field">
@@ -89,12 +98,25 @@ function TimeField({
           type="datetime-local"
           name={name}
           required={required}
-          defaultValue={value ? miamiLocalTime(value) : ""}
+          value={local}
+          onChange={(event) => {
+            const next = event.target.value;
+            setLocal(next);
+            for (const candidate of [offset, "-04:00", "-05:00"]) {
+              try {
+                miamiInstant(next, candidate);
+                setOffset(candidate);
+                break;
+              } catch {
+                /* Keep invalid dates visible for validation. */
+              }
+            }
+          }}
         />
       </label>
       <label className="field">
         {t("Zona de Miami", "Miami time zone")}
-        <select name={`${name}_offset`} defaultValue={value ? miamiOffset(value) : "-04:00"}>
+        <select name={`${name}_offset`} value={offset} onChange={(event) => setOffset(event.target.value)}>
           <option value="-04:00">EDT (UTC−04:00)</option>
           <option value="-05:00">EST (UTC−05:00)</option>
         </select>
@@ -379,9 +401,29 @@ function Measurements({
 }) {
   const { t } = useLanguage();
   const [state, action, pending] = useActionState(recordMove, initialResult);
+  const [miles, setMiles] = useState(String(move.actual_miles ?? ""));
+  const [validationError, setValidationError] = useState("");
+  const missingEnd = !move.finished_at;
+  const missingMiles = quote.mode === "PER_MILE" && move.actual_miles == null;
   return (
     <ConfirmedForm
       action={action}
+      validate={(data, intent) => {
+        if (pending) return false;
+        const result = validateMeasurements(
+          {
+            start: String(data.get("start") ?? ""),
+            start_offset: String(data.get("start_offset") ?? ""),
+            end: String(data.get("end") ?? ""),
+            end_offset: String(data.get("end_offset") ?? ""),
+            miles: String(data.get("miles") ?? ""),
+          },
+          intent as "start" | "save" | "complete" | "correct",
+          quote.mode,
+        );
+        setValidationError(result.error);
+        return !result.error;
+      }}
       className="stack"
       values={["complete", "correct"]}
       question={t(
@@ -397,35 +439,56 @@ function Measurements({
           "From arrival at origin through completed unloading, including breaks and travel between homes. Excludes travel to/from base.",
         )}
       </p>
-      <TimeField
-        name="start"
-        label={t("Llegada al origen", "Arrival at origin")}
-        value={move.started_at ?? now}
-      />
-      {move.status !== "SCHEDULED" && (
-        <>
-          <TimeField
-            name="end"
-            label={t("Descarga finalizada", "Unloading completed")}
-            value={move.finished_at ?? ""}
-            required={move.status === "COMPLETED"}
-          />
-          {quote.mode === "PER_MILE" && (
-            <label className="field">
-              {t("Millas reales de ida", "Actual one-way miles")}
-              <input
-                type="number"
-                name="miles"
-                min="0.0001"
-                max="10000"
-                step="0.0001"
-                defaultValue={move.actual_miles ?? ""}
-              />
-            </label>
-          )}
-        </>
+      <fieldset
+        disabled={pending}
+        className="stack"
+        style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
+      >
+        <TimeField
+          name="start"
+          label={t("Llegada al origen", "Arrival at origin")}
+          value={move.started_at ?? now}
+        />
+        {move.status !== "SCHEDULED" && (
+          <>
+            <TimeField
+              name="end"
+              label={t("Descarga finalizada", "Unloading completed")}
+              value={move.finished_at ?? ""}
+              required={move.status === "COMPLETED"}
+            />
+            {quote.mode === "PER_MILE" && (
+              <label className="field">
+                {t("Millas reales de ida", "Actual one-way miles")}
+                <input
+                  type="number"
+                  name="miles"
+                  min="0.0001"
+                  max="10000"
+                  step="0.0001"
+                  value={miles}
+                  onChange={(event) => setMiles(event.target.value)}
+                />
+              </label>
+            )}
+          </>
+        )}
+      </fieldset>
+      {move.status === "IN_PROGRESS" && (
+        <p className="notice" role="status">
+          {t("Últimas mediciones guardadas.", "Latest saved measurements.")}{" "}
+          {missingEnd &&
+            t(
+              "Falta guardar la fecha y hora de descarga finalizada. ",
+              "The unloading finish date and time are still missing. ",
+            )}
+          {missingMiles && t("Falta guardar las millas reales. ", "Actual miles are still missing. ")}
+          {!missingEnd &&
+            !missingMiles &&
+            t("Puedes completar la mudanza con estos datos.", "You can complete the move with these values.")}
+        </p>
       )}
-      <ResultNotice result={state} />
+      <ResultNotice result={validationError ? { error: validationError, success: false } : state} />
       <div className="row">
         {move.status === "SCHEDULED" ? (
           <Button name="action" value="start" disabled={pending}>
