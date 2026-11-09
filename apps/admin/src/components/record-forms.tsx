@@ -7,6 +7,7 @@ import { useActionState, useState } from "react";
 import { changeRequest, editCustomer, editRequest, saveNote } from "@/app/(staff)/actions";
 import { DateText, initialResult, ResultNotice } from "./record-ui";
 import { useRouteAddresses } from "./route-addresses";
+import { RouteSuggestion } from "./route-suggestion";
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 export type RequestRecord = Row<"moving_requests"> & {
@@ -91,7 +92,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
               label={t("Buscar dirección o ZIP", "Search address or ZIP")}
               value={{ input: addresses[index]?.input ?? "", resolution_token: null }}
               onChange={(value) => edit(index, value.input)}
-              onPlaceSelect={(position, address) => select(index, position, address)}
+              onPlaceSelect={(position, address, county) => select(index, position, address, county)}
               invalid={false}
               disabled={pending}
             />
@@ -205,6 +206,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
             <textarea name="comments" defaultValue={request.comments} maxLength={4000} rows={3} />
           </label>
         </div>
+        <RouteSuggestion />
         <label className="check-field">
           <input type="checkbox" name="territorial_reviewed" required />
           {t(

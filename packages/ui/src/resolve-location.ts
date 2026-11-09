@@ -11,6 +11,7 @@ export type SavedLocation = {
   precision: string;
 };
 export type ResolvedLocation = {
+  county?: string;
   position: google.maps.LatLngLiteral;
   precision: "ADDRESS" | "POSTAL_CODE";
   details?: Pick<SavedLocation, "street" | "city" | "postal_code" | "place_id">;
@@ -81,6 +82,10 @@ export function compatibleResult(
     }
   }
   return {
+    county:
+      result.address_components.filter((c) => c.types.includes("administrative_area_level_2")).length === 1
+        ? component("administrative_area_level_2")
+        : undefined,
     position: result.geometry.location.toJSON(),
     precision: postal ? "POSTAL_CODE" : "ADDRESS",
     details: {

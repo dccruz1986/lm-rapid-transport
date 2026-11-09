@@ -25,7 +25,7 @@ export function LocationField({
   label: string;
   value: LocationValue;
   onChange: (v: LocationValue) => void;
-  onPlaceSelect?: (position: google.maps.LatLngLiteral, address: SelectedLocation) => void;
+  onPlaceSelect?: (position: google.maps.LatLngLiteral, address: SelectedLocation, county?: string) => void;
   onPlaceInvalid?: () => void;
   invalid: boolean;
   disabled: boolean;
@@ -146,14 +146,20 @@ export function LocationField({
         }
         setSelectedInput(value.input);
         const component = (type: string) => components.find((c) => c.types.includes(type))?.longText ?? "";
-        onPlaceSelect(place.location.toJSON(), {
-          place_id: item.id,
-          precision: component("street_number") ? "ADDRESS" : "POSTAL_CODE",
-          label: item.label,
-          street: [component("street_number"), component("route")].filter(Boolean).join(" "),
-          city: component("locality") || component("sublocality_level_1"),
-          postal_code: component("postal_code"),
-        });
+        onPlaceSelect(
+          place.location.toJSON(),
+          {
+            place_id: item.id,
+            precision: component("street_number") ? "ADDRESS" : "POSTAL_CODE",
+            label: item.label,
+            street: [component("street_number"), component("route")].filter(Boolean).join(" "),
+            city: component("locality") || component("sublocality_level_1"),
+            postal_code: component("postal_code"),
+          },
+          components.filter((c) => c.types.includes("administrative_area_level_2")).length === 1
+            ? component("administrative_area_level_2")
+            : undefined,
+        );
         setMessage(item.label);
         return;
       }

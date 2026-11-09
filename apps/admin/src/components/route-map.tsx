@@ -7,6 +7,7 @@ import { LocationField } from "@lm/ui/location-field";
 import { useEffect, useRef, useState } from "react";
 
 import { useRouteAddresses } from "./route-addresses";
+import { RouteSuggestion } from "./route-suggestion";
 
 const MIAMI = { lat: 25.7617, lng: -80.1918 };
 
@@ -99,6 +100,7 @@ export function RouteMap(_props: {
   return (
     <section className="card stack">
       <h2>{t("Mapa del recorrido", "Route map")}</h2>
+      <RouteSuggestion />
       <div className="form-grid">
         {inputs.map((input, i) => (
           <LocationField
@@ -112,7 +114,7 @@ export function RouteMap(_props: {
             invalid={false}
             disabled={false}
             onChange={(value) => edit(i, value.input)}
-            onPlaceSelect={(position, address) => select(i, position, address)}
+            onPlaceSelect={(position, address, county) => select(i, position, address, county)}
           />
         ))}
       </div>
