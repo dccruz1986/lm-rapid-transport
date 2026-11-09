@@ -48,6 +48,18 @@ test("postal point stays approximate", () => {
       ?.precision,
   ).toBe("POSTAL_CODE");
 });
+test("county evidence is available only for a single compatible component", () => {
+  const resolved = result();
+  const county = {
+    types: ["administrative_area_level_2"],
+    short_name: "Palm Beach County",
+    long_name: "Palm Beach County",
+  };
+  resolved.address_components.push(county);
+  expect(compatibleResult(address, resolved)?.county).toBe("Palm Beach County");
+  resolved.address_components.push({ ...county, short_name: "Miami-Dade County" });
+  expect(compatibleResult(address, resolved)?.county).toBeUndefined();
+});
 test("saved ID precedes historical text; obsolete ID falls back once", async () => {
   const calls: google.maps.GeocoderRequest[] = [];
   const geocode = async (request: google.maps.GeocoderRequest) => {

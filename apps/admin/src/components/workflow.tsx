@@ -18,8 +18,11 @@ import {
   scheduleMove,
 } from "@/app/(staff)/workflow-actions";
 import { ConfirmedForm } from "./confirmed-form";
+import { initialQuoteDraft, reconcileQuote } from "./quote-draft";
 import { RequestEditor, type RequestRecord } from "./record-forms";
 import { DateText, initialResult, ResultNotice, StatusBadge } from "./record-ui";
+import { useRouteAddresses } from "./route-addresses";
+import { RouteSuggestion } from "./route-suggestion";
 
 type Row<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 type Props = {
@@ -127,7 +130,7 @@ function TimeField({
 function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quote" | "settings">) {
   const { t } = useLanguage();
   const [state, action, pending] = useActionState(saveQuote, initialResult);
-  const [mode, setMode] = useState<"" | "LOCAL" | "PER_MILE">(
+  const initialMode =
     quote?.mode === "PER_MILE"
       ? "PER_MILE"
       : quote
@@ -136,8 +139,7 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
           ? "PER_MILE"
           : request.suggested_mode === "LOCAL"
             ? "LOCAL"
-            : "",
-  );
+            : "";
   const [workers, setWorkers] = useState(quote?.workers ?? request.workers ?? 2);
   const rateFor = (m: string, w: number) =>
     m === "PER_MILE"
@@ -147,10 +149,18 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
         : w === 3
           ? settings.hourly_three
           : settings.hourly_four;
-  const [rate, setRate] = useState(
-    mode ? ((quote?.rate_cents ?? rateFor(mode, workers)) / 100).toFixed(2) : "",
+  const { estimate } = useRouteAddresses();
+  const [storedDraft, setDraft] = useState(() =>
+    initialQuoteDraft(
+      initialMode,
+      initialMode ? ((quote?.rate_cents ?? rateFor(initialMode, workers)) / 100).toFixed(2) : "",
+      quote?.estimated_quantity,
+    ),
   );
-  const [quantity, setQuantity] = useState(String(quote?.estimated_quantity ?? 3));
+  const draft = reconcileQuote(storedDraft, estimate, (m) => (rateFor(m, workers) / 100).toFixed(2));
+  if (draft !== storedDraft) setDraft(draft);
+  const { mode, rate } = draft;
+  const quantity = mode ? draft[mode].value : "";
   let preview: number | null = null;
   try {
     if (mode)
@@ -164,6 +174,23 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
   return (
     <form action={action} className="stack">
       <Identity request={request.id} version={quote?.version ?? 0} />
+      <RouteSuggestion />
+      {estimate.mode && mode && estimate.mode !== mode && (
+        <p className="notice">
+          {t(
+            "El recorrido sugiere otra modalidad. Revisa los términos y cambia la modalidad explícitamente si corresponde.",
+            "The route suggests a different pricing mode. Review the terms and explicitly change the mode if appropriate.",
+          )}
+        </p>
+      )}
+      {mode && ["manual", "saved"].includes(draft[mode].source) && (
+        <p className="muted">
+          {t(
+            "Se conserva tu cantidad. Revisa que corresponda al recorrido actual antes de guardar.",
+            "Your quantity is preserved. Check that it matches the current route before saving.",
+          )}
+        </p>
+      )}
       <p className="muted">
         {t(
           "Confirma los condados: LOCAL solo si ambos extremos están en la condado Miami-Dade. El nombre postal no basta.",
@@ -179,8 +206,13 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
             value={mode}
             onChange={(e) => {
               const m = e.target.value as "LOCAL" | "PER_MILE";
-              setMode(m);
-              setRate((rateFor(m, workers) / 100).toFixed(2));
+              setDraft((d) => ({
+                ...d,
+                mode: m,
+                modeManual: true,
+                rate: (rateFor(m, workers) / 100).toFixed(2),
+                rateManual: false,
+              }));
             }}
           >
             <option value="" disabled>
@@ -201,7 +233,11 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
             onChange={(e) => {
               const w = Number(e.target.value);
               setWorkers(w);
-              setRate(mode ? (rateFor(mode, w) / 100).toFixed(2) : "");
+              setDraft((d) => ({
+                ...d,
+                rate: mode ? (rateFor(mode, w) / 100).toFixed(2) : "",
+                rateManual: false,
+              }));
             }}
           >
             {[2, 3, 4].map((w) => (
@@ -224,7 +260,7 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
             max="100000"
             step="0.01"
             value={rate}
-            onChange={(e) => setRate(e.target.value)}
+            onChange={(e) => setDraft((d) => ({ ...d, rate: e.target.value, rateManual: true }))}
             required
           />
         </label>
@@ -241,11 +277,27 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
             max={mode === "LOCAL" ? 168 : 10000}
             step="0.0001"
             value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
+            onChange={(e) => {
+              if (mode) setDraft((d) => ({ ...d, [mode]: { value: e.target.value, source: "manual" } }));
+            }}
             required
           />
         </label>
       </div>
+      {mode === "PER_MILE" && estimate.miles !== undefined && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() =>
+            setDraft((d) => ({
+              ...d,
+              PER_MILE: { value: estimate.miles?.toFixed(1) ?? "", source: "suggested", key: estimate.key },
+            }))
+          }
+        >
+          {t("Usar distancia sugerida", "Use suggested distance")}
+        </Button>
+      )}
       {mode === "LOCAL" && (
         <p>
           {t("Mínimo copiado", "Copied minimum")}: {quote?.minimum_hours ?? settings.minimum_hours} h
