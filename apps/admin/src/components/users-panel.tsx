@@ -1,7 +1,9 @@
 "use client";
 import { Button, useLanguage } from "@lm/ui";
+import { FieldError, ValidatedForm } from "@lm/ui/validated-form";
 import { useActionState } from "react";
 import { invite, setActive } from "@/app/auth/actions";
+import { initialResult, ResultNotice } from "./record-ui";
 export function UsersPanel({
   users,
   canAdmin,
@@ -19,10 +21,11 @@ export function UsersPanel({
       </div>
       <section className="card">
         <h2>{t("Invitar personal", "Invite a teammate")}</h2>
-        <form action={action} className="form-grid">
+        <ValidatedForm result={state} action={action} className="form-grid">
           <label className="field">
             {t("Correo electrónico", "Email")}
             <input name="email" type="email" required />
+            <FieldError name="email" />
           </label>
           <label className="field">
             {t("Rol", "Role")}
@@ -31,6 +34,7 @@ export function UsersPanel({
               <option value="MANAGER">MANAGER</option>
               {canAdmin && <option value="ADMIN">ADMIN</option>}
             </select>
+            <FieldError name="role" />
           </label>
           <div className="full">
             <Button disabled={pending}>
@@ -49,21 +53,30 @@ export function UsersPanel({
                       "Falta configurar el servicio de correo. La cuenta puede quedar pendiente de invitación.",
                       "Email service configuration is missing. The account may remain pending invitation.",
                     )
-                    : state.error === "MAIL_DOMAIN_UNVERIFIED"
-                      ? t("El dominio del remitente no está verificado en Resend. Configura RESEND_FROM_EMAIL con un dominio propio verificado; no puede ser gmail.com.", "The sender domain is not verified in Resend. Set RESEND_FROM_EMAIL to an address on your verified domain; it cannot be gmail.com.")
-                    : state.error === "MAIL_TEST_RECIPIENT_ONLY"
-                      ? t("El remitente de prueba de Resend solo permite enviar a tu correo de registro en Resend. Verifica un dominio propio para invitar a otros usuarios.", "Resend's test sender only allows your Resend account email. Verify your own domain to invite other users.")
-                    : state.error === "MAIL_API_KEY_INVALID"
-                      ? t("Resend rechazó la API key. Revisa RESEND_API_KEY en la función de correo.", "Resend rejected the API key. Check RESEND_API_KEY in the email function.")
-                    : state.error === "USER_EXISTS" || state.error === "FORBIDDEN"
+                  : state.error === "MAIL_DOMAIN_UNVERIFIED"
                     ? t(
-                        "La cuenta ya tiene acceso, el rol no coincide o no tienes permiso para invitarla.",
-                        "The account already has access, the role differs, or you lack permission to invite it.",
+                        "El dominio del remitente no está verificado en Resend. Configura RESEND_FROM_EMAIL con un dominio propio verificado; no puede ser gmail.com.",
+                        "The sender domain is not verified in Resend. Set RESEND_FROM_EMAIL to an address on your verified domain; it cannot be gmail.com.",
                       )
-                    : t(
-                        "No se pudo confirmar el envío. Si la cuenta fue creada, queda pendiente: reintenta con el mismo correo y rol después de un minuto.",
-                        "Sending could not be confirmed. If the account was created, it remains pending: retry with the same email and role after a minute.",
-                      )}
+                    : state.error === "MAIL_TEST_RECIPIENT_ONLY"
+                      ? t(
+                          "El remitente de prueba de Resend solo permite enviar a tu correo de registro en Resend. Verifica un dominio propio para invitar a otros usuarios.",
+                          "Resend's test sender only allows your Resend account email. Verify your own domain to invite other users.",
+                        )
+                      : state.error === "MAIL_API_KEY_INVALID"
+                        ? t(
+                            "Resend rechazó la API key. Revisa RESEND_API_KEY en la función de correo.",
+                            "Resend rejected the API key. Check RESEND_API_KEY in the email function.",
+                          )
+                        : state.error === "USER_EXISTS" || state.error === "FORBIDDEN"
+                          ? t(
+                              "La cuenta ya tiene acceso, el rol no coincide o no tienes permiso para invitarla.",
+                              "The account already has access, the role differs, or you lack permission to invite it.",
+                            )
+                          : t(
+                              "No se pudo confirmar el envío. Si la cuenta fue creada, queda pendiente: reintenta con el mismo correo y rol después de un minuto.",
+                              "Sending could not be confirmed. If the account was created, it remains pending: retry with the same email and role after a minute.",
+                            )}
             </p>
           )}
           {state.success && (
@@ -74,7 +87,7 @@ export function UsersPanel({
               )}
             </p>
           )}
-        </form>
+        </ValidatedForm>
       </section>
       <div className="table-wrap">
         <table>
@@ -92,32 +105,33 @@ export function UsersPanel({
                 <td>{user.email}</td>
                 <td>{user.role}</td>
                 <td>{user.active ? t("Activo", "Active") : t("Inactivo", "Inactive")}</td>
-                <td>
-                  {(canAdmin || user.role !== "ADMIN") && (
-                    <form
-                      action={setActive}
-                      onSubmit={(event) => {
-                        if (
-                          !window.confirm(
-                            t("¿Cambiar el acceso de este usuario?", "Change this user's access?"),
-                          )
-                        )
-                          event.preventDefault();
-                      }}
-                    >
-                      <input type="hidden" name="id" value={user.id} />
-                      <input type="hidden" name="active" value={String(!user.active)} />
-                      <Button size="sm" variant="outline">
-                        {user.active ? t("Desactivar", "Deactivate") : t("Activar", "Activate")}
-                      </Button>
-                    </form>
-                  )}
-                </td>
+                <td>{(canAdmin || user.role !== "ADMIN") && <AccessAction user={user} />}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+function AccessAction({ user }: { user: { id: string; active: boolean } }) {
+  const { t } = useLanguage();
+  const [state, action, pending] = useActionState(setActive, initialResult);
+  return (
+    <form
+      action={action}
+      onSubmit={(e) => {
+        if (!window.confirm(t("¿Cambiar el acceso de este usuario?", "Change this user's access?")))
+          e.preventDefault();
+      }}
+    >
+      <input type="hidden" name="id" value={user.id} />
+      <input type="hidden" name="active" value={String(!user.active)} />
+      <Button size="sm" variant="outline" disabled={pending}>
+        {user.active ? t("Desactivar", "Deactivate") : t("Activar", "Activate")}
+      </Button>
+      <ResultNotice result={state} />
+    </form>
   );
 }

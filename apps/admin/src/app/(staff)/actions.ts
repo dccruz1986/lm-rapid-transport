@@ -1,13 +1,21 @@
 "use server";
 import { requireStaff } from "@lm/data/server";
-import { fullContactSchema, operationalEditSchema } from "@lm/validation";
+import {
+  contactFields,
+  fieldFailure,
+  fullContactSchema,
+  operationalEditSchema,
+  requestAliases,
+  requestFields,
+  validationFailure,
+} from "@lm/validation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { FormResult } from "@/components/record-ui";
 
 function result(error: { message: string; code?: string } | null): FormResult {
   if (!error) return { error: "", success: true };
-  if (error.code === "23505") return { error: "PHONE_CONFLICT", success: false };
+  if (error.message.includes("PHONE_CONFLICT")) return fieldFailure("phone", "PHONE_CONFLICT");
   const code = [
     "PHONE_CONFLICT",
     "CONFLICT",
@@ -26,7 +34,7 @@ export async function changeRequest(_previous: FormResult, form: FormData): Prom
   const parsed = identity
     .extend({ action: z.enum(["contact", "cancel", "reactivate"]), reason: z.string().max(1000).default("") })
     .safeParse(Object.fromEntries(form));
-  if (!parsed.success) return { error: "INVALID_INPUT", success: false };
+  if (!parsed.success) return validationFailure(parsed.error, ["reason"]);
   const { db } = await requireStaff(
     parsed.data.action === "cancel"
       ? "records.cancel"
@@ -52,7 +60,8 @@ export async function saveNote(_previous: FormResult, form: FormData): Promise<F
       action: z.enum(["save", "delete"]),
     })
     .safeParse(Object.fromEntries(form));
-  if (!parsed.success) return { error: "INVALID_INPUT", success: false };
+  if (!parsed.success) return validationFailure(parsed.error, ["body"]);
+  if (parsed.data.action === "save" && !parsed.data.body.trim()) return fieldFailure("body", "REQUIRED");
   const { db } = await requireStaff("notes.manage");
   const { error } = await db.rpc("save_note", {
     p_request: parsed.data.request,
@@ -66,7 +75,8 @@ export async function saveNote(_previous: FormResult, form: FormData): Promise<F
 export async function editCustomer(_previous: FormResult, form: FormData): Promise<FormResult> {
   const id = identity.safeParse(Object.fromEntries(form));
   const contact = fullContactSchema.safeParse(Object.fromEntries(form));
-  if (!id.success || !contact.success) return { error: "INVALID_INPUT", success: false };
+  if (!id.success) return { error: "INVALID_INPUT", success: false };
+  if (!contact.success) return validationFailure(contact.error, contactFields);
   const { db } = await requireStaff("requests.edit");
   const { error } = await db.rpc("edit_customer_name", {
     p_id: id.data.id,
@@ -115,7 +125,8 @@ export async function editRequest(_previous: FormResult, form: FormData): Promis
     workers: optionalNumber("workers"),
     comments: text("comments"),
   });
-  if (!id.success || !parsed.success) return { error: `INVALID_INPUT ${parsed.error}`, success: false };
+  if (!id.success) return { error: "INVALID_INPUT", success: false };
+  if (!parsed.success) return validationFailure(parsed.error, requestFields, requestAliases);
   const { db } = await requireStaff("requests.edit");
   const { error } = await db.rpc("edit_request", {
     p_id: id.data.id,

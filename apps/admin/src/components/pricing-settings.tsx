@@ -1,6 +1,7 @@
 "use client";
 import type { Database } from "@lm/types/database";
 import { Button, useLanguage } from "@lm/ui";
+import { FieldError, ValidatedForm } from "@lm/ui/validated-form";
 import { useActionState } from "react";
 import { savePricing } from "@/app/(staff)/settings/actions";
 import { DateText, initialResult, PageHeading, ResultNotice } from "./record-ui";
@@ -41,7 +42,7 @@ export function PricingSettings({
           "Changes apply to new quotes. Existing quotes keep their terms.",
         ]}
       />
-      <form action={action} className="card stack">
+      <ValidatedForm result={state} action={action} className="card stack">
         <input type="hidden" name="version" value={settings.version} />
         <p>
           {t(
@@ -63,6 +64,7 @@ export function PricingSettings({
                 required
                 defaultValue={(settings[key] / 100).toFixed(2)}
               />
+              <FieldError name={key} />
             </label>
           ))}
           <label className="field">
@@ -77,13 +79,14 @@ export function PricingSettings({
               required
               defaultValue={settings.minimum_hours}
             />
+            <FieldError name="minimum_hours" />
           </label>
         </div>
         <ResultNotice result={state} />
         <Button disabled={pending}>
           {pending ? t("Guardando…", "Saving…") : t("Guardar tarifas", "Save pricing")}
         </Button>
-      </form>
+      </ValidatedForm>
       <section className="card stack">
         <h2>{t("Últimos cambios de tarifas", "Recent pricing changes")}</h2>
         {history.length ? (

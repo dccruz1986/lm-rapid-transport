@@ -1,6 +1,14 @@
 "use server";
 import { requireStaff } from "@lm/data/server";
-import { dollarsToCents, miamiInstant, quoteSchema, validateMeasurements } from "@lm/validation";
+import {
+  dollarsToCents,
+  fieldFailure,
+  measurementFailure,
+  miamiInstant,
+  quoteSchema,
+  validateMeasurements,
+  validationFailure,
+} from "@lm/validation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { FormResult } from "@/components/record-ui";
@@ -27,11 +35,11 @@ const invalid: FormResult = { error: "INVALID_INPUT", success: false };
 export async function saveQuote(_previous: FormResult, form: FormData): Promise<FormResult> {
   const { db } = await requireStaff("quotes.edit");
   const id = identity.safeParse(Object.fromEntries(form));
-  let rate: number;
+  let rate = Number.NaN;
   try {
     rate = dollarsToCents(text(form, "rate"));
   } catch {
-    return invalid;
+    // Continue parsing so quantity and other field errors are returned together.
   }
   const data = quoteSchema.safeParse({
     mode: text(form, "mode"),
@@ -39,7 +47,15 @@ export async function saveQuote(_previous: FormResult, form: FormData): Promise<
     rate_cents: rate,
     estimated_quantity: Number(text(form, "quantity")),
   });
-  if (!id.success || !data.success) return invalid;
+  if (!id.success) return invalid;
+  if (!data.success) {
+    const failure = validationFailure(data.error, ["mode", "workers", "rate", "quantity"], {
+      rate_cents: "rate",
+      estimated_quantity: "quantity",
+    });
+    if (failure.fieldErrors?.rate) failure.fieldErrors.rate = { code: "MONEY" };
+    return failure;
+  }
   return response(
     (
       await db.rpc("save_quote", {
@@ -71,14 +87,22 @@ export async function communicateQuote(_previous: FormResult, form: FormData): P
   const { db } = await requireStaff("quotes.confirm");
   const id = identity.safeParse(Object.fromEntries(form));
   const medium = z.enum(["PHONE", "WHATSAPP", "EMAIL"]).safeParse(text(form, "medium"));
-  if (!id.success || !medium.success || text(form, "response").length > 2000) return invalid;
+  if (!id.success) return invalid;
+  if (!medium.success) return fieldFailure("medium", "CHOICE");
+  if (text(form, "response").length > 2000)
+    return {
+      ...fieldFailure("response", "MAX_LENGTH"),
+      fieldErrors: { response: { code: "MAX_LENGTH", limit: 2000 } },
+    };
+  if (form.get("confirm") === "on" && !text(form, "response").trim())
+    return fieldFailure("response", "REQUIRED");
   let at: string;
   try {
     at = miamiInstant(text(form, "at"), text(form, "at_offset"));
   } catch {
-    return invalid;
+    return fieldFailure("at", "DATE_INVALID");
   }
-  console.log("form", form);
+  if (Date.parse(at) > Date.now()) return fieldFailure("at", "DATE_FUTURE");
   const responseControl: FormResult = response(
     (
       await db.rpc("communicate_quote", {
@@ -91,7 +115,6 @@ export async function communicateQuote(_previous: FormResult, form: FormData): P
       })
     ).error,
   );
-  console.log("response", responseControl);
   return responseControl;
 }
 export async function scheduleMove(_previous: FormResult, form: FormData): Promise<FormResult> {
@@ -102,13 +125,20 @@ export async function scheduleMove(_previous: FormResult, form: FormData): Promi
       notes: z.string().max(4000),
     })
     .safeParse(Object.fromEntries(form));
-  if (!id.success) return invalid;
+  if (!id.success) return validationFailure(id.error, ["duration", "notes"]);
   let at: string;
   try {
     at = miamiInstant(text(form, "at"), text(form, "at_offset"));
   } catch {
-    return invalid;
+    return fieldFailure("at", "DATE_INVALID");
   }
+  if (Date.parse(at) <= Date.now()) return fieldFailure("at", "DATE_AFTER_NOW");
+  if (
+    new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short" }).format(
+      new Date(at),
+    ) === "Sun"
+  )
+    return fieldFailure("at", "DATE_SUNDAY");
   return response(
     (
       await db.rpc("schedule_move", {
@@ -143,7 +173,7 @@ export async function recordMove(_previous: FormResult, form: FormData): Promise
     action.data,
     quote.mode,
   );
-  if (measurement.error) return { error: measurement.error, success: false };
+  if (measurement.error) return measurementFailure(measurement.error);
   return response(
     (
       await db.rpc("record_move", {

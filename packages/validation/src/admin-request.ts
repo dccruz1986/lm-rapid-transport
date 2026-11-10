@@ -35,7 +35,11 @@ export const adminRequestSchema = fullContactSchema
       data.moving_date &&
       (data.moving_date <= miamiDate() || new Date(`${data.moving_date}T12:00:00Z`).getUTCDay() === 0)
     ) {
-      ctx.addIssue({ code: "custom", path: ["moving_date"], message: "INVALID_DATE" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["moving_date"],
+        message: data.moving_date <= miamiDate() ? "DATE_TOMORROW" : "DATE_SUNDAY",
+      });
     }
   });
 export type AdminRequestInput = z.infer<typeof adminRequestSchema>;

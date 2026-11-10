@@ -2,6 +2,7 @@
 import type { Database } from "@lm/types/database";
 import { Button, useLanguage } from "@lm/ui";
 import { LocationField } from "@lm/ui/location-field";
+import { FieldError, ValidatedForm } from "@lm/ui/validated-form";
 import { displayName } from "@lm/validation";
 import { useActionState, useState } from "react";
 import { changeRequest, editCustomer, editRequest, saveNote } from "@/app/(staff)/actions";
@@ -40,11 +41,13 @@ function ContactFields({
             required
             maxLength={name === "phone" ? 40 : 160}
           />
+          <FieldError name={name} />
         </label>
       ))}
       <label className="field">
         {t("Correo (opcional)", "Email (optional)")}
         <input name="email" type="email" defaultValue={value.email ?? ""} maxLength={254} />
+        <FieldError name="email" />
       </label>
     </>
   );
@@ -53,7 +56,7 @@ export function CustomerEditor({ customer }: { customer: Row<"customers"> }) {
   const { t } = useLanguage();
   const [state, action, pending] = useActionState(editCustomer, initialResult);
   return (
-    <form action={action} className="card stack">
+    <ValidatedForm result={state} action={action} className="card stack">
       <h2>{t("Información del cliente", "Customer information")}</h2>
       <input type="hidden" name="id" value={customer.id} />
       <input type="hidden" name="version" value={customer.version} />
@@ -68,7 +71,7 @@ export function CustomerEditor({ customer }: { customer: Row<"customers"> }) {
           "Contact details submitted in previous requests are preserved.",
         )}
       </p>
-    </form>
+    </ValidatedForm>
   );
 }
 export function RequestEditor({ request }: { request: RequestRecord }) {
@@ -79,7 +82,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
   return (
     <details className="card" open>
       <summary>{t("Datos del cliente y direcciones", "Customer details and addresses")}</summary>
-      <form action={action} className="stack" style={{ marginTop: 24 }}>
+      <ValidatedForm result={state} action={action} className="stack" style={{ marginTop: 24 }}>
         <input type="hidden" name="id" value={request.id} />
         <input type="hidden" name="version" value={request.version} />
         <div className="form-grid">
@@ -89,6 +92,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
           <fieldset key={side} className="address-group">
             <legend>{side === "origin" ? t("Origen", "Origin") : t("Destino", "Destination")} · FL</legend>
             <LocationField
+              name={side}
               label={t("Buscar dirección o ZIP", "Search address or ZIP")}
               value={{ input: addresses[index]?.input ?? "", resolution_token: null }}
               onChange={(value) => edit(index, value.input)}
@@ -108,6 +112,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
               <label className="field">
                 {t("Unidad (opcional)", "Unit (optional)")}
                 <input name={`${side}.unit`} defaultValue={request[side].unit ?? ""} />
+                <FieldError name={`${side}.unit`} />
               </label>
               <label className="field">
                 {t("Piso", "Floor")}
@@ -118,6 +123,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
                   min={-5}
                   max={150}
                 />
+                <FieldError name={`${side}_floor`} />
               </label>
               <label className="field">
                 {t("Elevador", "Elevator")}
@@ -133,6 +139,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
                   <option value="true">{t("Sí", "Yes")}</option>
                   <option value="false">No</option>
                 </select>
+                <FieldError name={side + "_elevator"} />
               </label>
               <label className="field">
                 {t("Condado verificado", "Verified county")}
@@ -141,6 +148,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
                   <option value="MIAMI_DADE">Miami-Dade</option>
                   <option value="OTHER_FL">{t("Otro condado de Florida", "Other Florida county")}</option>
                 </select>
+                <FieldError name={side + "_county"} />
               </label>
             </div>
           </fieldset>
@@ -155,6 +163,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
               <option value="OFFICE">{t("Oficina", "Office")}</option>
               <option value="COMMERCIAL">{t("Comercio", "Business")}</option>
             </select>
+            <FieldError name="property_type" />
           </label>
           {["HOUSE", "APARTMENT"].includes(property) && (
             <label className="field">
@@ -167,6 +176,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
                 defaultValue={request.bedrooms ?? ""}
                 required
               />
+              <FieldError name="bedrooms" />
             </label>
           )}
           <label className="field">
@@ -178,6 +188,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
               max={1000000}
               defaultValue={request.property_size ?? ""}
             />
+            <FieldError name="property_size" />
           </label>
           <label className="field">
             {t("Unidad", "Unit")}
@@ -185,6 +196,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
               <option value="SQFT">ft²</option>
               <option value="SQM">m²</option>
             </select>
+            <FieldError name="size_unit" />
           </label>
           <label className="field">
             {t("Trabajadores", "Movers")}
@@ -196,19 +208,23 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
                 </option>
               ))}
             </select>
+            <FieldError name="workers" />
           </label>
           <label className="field">
             {t("Fecha deseada (opcional)", "Preferred date (optional)")}
             <input name="moving_date" type="date" defaultValue={request.moving_date ?? ""} />
+            <FieldError name="moving_date" />
           </label>
           <label className="field full">
             {t("Comentarios", "Comments")}
             <textarea name="comments" defaultValue={request.comments} maxLength={4000} rows={3} />
+            <FieldError name="comments" />
           </label>
         </div>
         <RouteSuggestion />
         <label className="check-field">
           <input type="checkbox" name="territorial_reviewed" required />
+          <FieldError name="territorial_reviewed" />
           {t(
             "Verifiqué las direcciones completas y sus condados dentro de Florida.",
             "I verified the full addresses and their counties within Florida.",
@@ -218,7 +234,7 @@ export function RequestEditor({ request }: { request: RequestRecord }) {
         <Button disabled={pending}>
           {t("Guardar datos y revisión del recorrido", "Save details and route review")}
         </Button>
-      </form>
+      </ValidatedForm>
     </details>
   );
 }
@@ -232,7 +248,8 @@ export function RequestActions({
   const { t } = useLanguage();
   const [state, action, pending] = useActionState(changeRequest, initialResult);
   return (
-    <form
+    <ValidatedForm
+      result={state}
       action={action}
       className="card stack"
       onSubmit={(e) => {
@@ -253,6 +270,7 @@ export function RequestActions({
           <label className="field">
             {t("Motivo de cancelación (opcional)", "Cancellation reason (optional)")}
             <input name="reason" maxLength={1000} />
+            <FieldError name="reason" />
           </label>
         )}
       <div className="row">
@@ -275,16 +293,20 @@ export function RequestActions({
         )}
       </div>
       <ResultNotice result={state} />
-    </form>
+    </ValidatedForm>
   );
 }
 export function NoteEditor({ requestId, note }: { requestId: string; note?: Row<"notes"> }) {
   const { t } = useLanguage();
   const [state, action, pending] = useActionState(saveNote, initialResult);
   return (
-    <form
+    <ValidatedForm
+      result={state}
       action={action}
       className="note-editor"
+      validate={(data, intent): import("@lm/types").FieldErrors =>
+        intent !== "delete" && !String(data.get("body") ?? "").trim() ? { body: { code: "REQUIRED" } } : {}
+      }
       onSubmit={(e) => {
         if (
           ((e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value === "delete" &&
@@ -298,6 +320,7 @@ export function NoteEditor({ requestId, note }: { requestId: string; note?: Row<
       <label className="field">
         {note ? t("Nota interna", "Internal note") : t("Nueva nota interna", "New internal note")}
         <textarea name="body" defaultValue={note?.body ?? ""} maxLength={4000} rows={3} />
+        <FieldError name="body" />
       </label>
       {note && (
         <p className="small muted">
@@ -315,6 +338,6 @@ export function NoteEditor({ requestId, note }: { requestId: string; note?: Row<
         )}
       </div>
       <ResultNotice result={state} />
-    </form>
+    </ValidatedForm>
   );
 }
