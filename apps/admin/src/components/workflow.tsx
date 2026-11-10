@@ -1,9 +1,11 @@
 "use client";
 import type { Database } from "@lm/types/database";
 import { Button, useLanguage } from "@lm/ui";
+import { FieldError, ValidatedForm } from "@lm/ui/validated-form";
 import {
   calculateTotal,
   dollarsToCents,
+  measurementFailure,
   miamiInstant,
   miamiLocalTime,
   miamiOffset,
@@ -116,6 +118,7 @@ function TimeField({
             }
           }}
         />
+        <FieldError name={name} />
       </label>
       <label className="field">
         {t("Zona de Miami", "Miami time zone")}
@@ -123,6 +126,7 @@ function TimeField({
           <option value="-04:00">EDT (UTC−04:00)</option>
           <option value="-05:00">EST (UTC−05:00)</option>
         </select>
+        <FieldError name={`${name}_offset`} />
       </label>
     </div>
   );
@@ -172,7 +176,7 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
       ).totalCents;
   } catch {}
   return (
-    <form action={action} className="stack">
+    <ValidatedForm result={state} action={action} className="stack">
       <Identity request={request.id} version={quote?.version ?? 0} />
       <RouteSuggestion />
       {estimate.mode && mode && estimate.mode !== mode && (
@@ -224,6 +228,7 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
             <option value="LOCAL">{t("Local — condado Miami-Dade", "Local — Miami-Dade County")}</option>
             <option value="PER_MILE">{t("Por millas — Florida", "Per mile — Florida")}</option>
           </select>
+          <FieldError name="mode" />
         </label>
         <label className="field">
           {t("Trabajadores + camión", "Movers + truck")}
@@ -246,6 +251,7 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
               </option>
             ))}
           </select>
+          <FieldError name="workers" />
         </label>
         <label className="field">
           {!mode
@@ -263,6 +269,7 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
             onChange={(e) => setDraft((d) => ({ ...d, rate: e.target.value, rateManual: true }))}
             required
           />
+          <FieldError name="rate" />
         </label>
         <label className="field">
           {!mode
@@ -282,6 +289,7 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
             }}
             required
           />
+          <FieldError name="quantity" />
         </label>
       </div>
       {mode === "PER_MILE" && estimate.miles !== undefined && (
@@ -308,7 +316,7 @@ function QuoteEditor({ request, quote, settings }: Pick<Props, "request" | "quot
       </p>
       <ResultNotice result={state} />
       <Button disabled={pending}>{t("Guardar cotización", "Save quote")}</Button>
-    </form>
+    </ValidatedForm>
   );
 }
 function QuoteApproval({
@@ -323,7 +331,7 @@ function QuoteApproval({
   const { t } = useLanguage();
   const [state, action, pending] = useActionState(quoteAction, initialResult);
   return (
-    <form action={action} className="stack">
+    <ValidatedForm result={state} action={action} className="stack">
       <Identity request={request} version={quote.version} />
       <div className="row">
         {quote.status === "ESTIMATED" && permissions.includes("quotes.approve") && (
@@ -338,7 +346,7 @@ function QuoteApproval({
         )}
       </div>
       <ResultNotice result={state} />
-    </form>
+    </ValidatedForm>
   );
 }
 function CommunicationForm({
@@ -356,7 +364,7 @@ function CommunicationForm({
   const [state, action, pending] = useActionState(communicateQuote, initialResult);
   const [confirm, setConfirm] = useState(false);
   return (
-    <form action={action} className="stack">
+    <ValidatedForm result={state} action={action} className="stack">
       <Identity request={request} version={quote.version} />
       <h3>{t("Registrar conversación y aceptación", "Record conversation and acceptance")}</h3>
       <TimeField
@@ -371,10 +379,12 @@ function CommunicationForm({
           <option value="WHATSAPP">WhatsApp</option>
           <option value="EMAIL">Email</option>
         </select>
+        <FieldError name="medium" />
       </label>
       <label className="field">
         {t("Respuesta del cliente", "Customer response")}
         <textarea name="response" maxLength={2000} rows={3} required={confirm && routeReady} />
+        <FieldError name="response" />
       </label>
       <label className="row">
         <input
@@ -384,6 +394,7 @@ function CommunicationForm({
           checked={confirm && routeReady}
           onChange={(event) => setConfirm(event.target.checked)}
         />
+        <FieldError name="confirm" />
         {t(
           "El cliente aceptó expresamente estas tarifas y condiciones; el total depende de las cantidades reales.",
           "The customer explicitly accepted these rates and terms; the total depends on actual quantities.",
@@ -399,14 +410,14 @@ function CommunicationForm({
       )}
       <ResultNotice result={state} />
       <Button disabled={pending}>{t("Registrar comunicación", "Record communication")}</Button>
-    </form>
+    </ValidatedForm>
   );
 }
 function ScheduleForm({ request, move, now }: { request: string; move: Row<"moves"> | null; now: string }) {
   const { t } = useLanguage();
   const [state, action, pending] = useActionState(scheduleMove, initialResult);
   return (
-    <form action={action} className="stack">
+    <ValidatedForm result={state} action={action} className="stack">
       <Identity request={request} version={move?.version ?? 0} />
       <h3>{t("Programación", "Scheduling")}</h3>
       <p className="muted">
@@ -430,14 +441,16 @@ function ScheduleForm({ request, move, now }: { request: string; move: Row<"move
           required
           defaultValue={move?.estimated_duration_minutes ?? 180}
         />
+        <FieldError name="duration" />
       </label>
       <label className="field">
         {t("Notas operativas", "Operational notes")}
         <textarea name="notes" maxLength={4000} defaultValue={move?.notes ?? ""} />
+        <FieldError name="notes" />
       </label>
       <ResultNotice result={state} />
       <Button disabled={pending}>{t("Guardar programación", "Save schedule")}</Button>
-    </form>
+    </ValidatedForm>
   );
 }
 function Measurements({
@@ -454,14 +467,13 @@ function Measurements({
   const { t } = useLanguage();
   const [state, action, pending] = useActionState(recordMove, initialResult);
   const [miles, setMiles] = useState(String(move.actual_miles ?? ""));
-  const [validationError, setValidationError] = useState("");
   const missingEnd = !move.finished_at;
   const missingMiles = quote.mode === "PER_MILE" && move.actual_miles == null;
   return (
     <ConfirmedForm
+      result={state}
       action={action}
       validate={(data, intent) => {
-        if (pending) return false;
         const result = validateMeasurements(
           {
             start: String(data.get("start") ?? ""),
@@ -473,8 +485,7 @@ function Measurements({
           intent as "start" | "save" | "complete" | "correct",
           quote.mode,
         );
-        setValidationError(result.error);
-        return !result.error;
+        return result.error ? (measurementFailure(result.error).fieldErrors ?? {}) : {};
       }}
       className="stack"
       values={["complete", "correct"]}
@@ -521,6 +532,7 @@ function Measurements({
                   value={miles}
                   onChange={(event) => setMiles(event.target.value)}
                 />
+                <FieldError name="miles" />
               </label>
             )}
           </>
@@ -540,7 +552,7 @@ function Measurements({
             t("Puedes completar la mudanza con estos datos.", "You can complete the move with these values.")}
         </p>
       )}
-      <ResultNotice result={validationError ? { error: validationError, success: false } : state} />
+      <ResultNotice result={state} />
       <div className="row">
         {move.status === "SCHEDULED" ? (
           <Button name="action" value="start" disabled={pending}>

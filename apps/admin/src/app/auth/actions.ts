@@ -2,6 +2,7 @@
 import { appUrl, supabaseEnvironment } from "@lm/config/env";
 import { privilegedClient } from "@lm/data/privileged";
 import { requireStaff, serverClient } from "@lm/data/server";
+import { fieldFailure, validationFailure } from "@lm/validation";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -12,7 +13,7 @@ const loginSchema = z.object({
 });
 export async function login(_previous: { error: string }, data: FormData) {
   const parsed = loginSchema.safeParse(Object.fromEntries(data));
-  if (!parsed.success) return { error: "INVALID_LOGIN" };
+  if (!parsed.success) return validationFailure(parsed.error, ["email", "password"]);
   const db = await serverClient();
   const { data: auth, error } = await db.auth.signInWithPassword(parsed.data);
 
@@ -33,16 +34,28 @@ export async function logout() {
 }
 export async function recover(_previous: { error: string; success: boolean }, data: FormData) {
   const parsed = z.email().safeParse(data.get("email"));
-  if (!parsed.success) return { error: "INVALID_EMAIL", success: false };
+  if (!parsed.success) return fieldFailure("email", "EMAIL");
   const db = await serverClient();
-  await db.auth.resetPasswordForEmail(parsed.data, {
+  const { error } = await db.auth.resetPasswordForEmail(parsed.data, {
     redirectTo: `${appUrl("admin")}/auth/set-password`,
   });
+  if (error && (error.status === 0 || (error.status ?? 0) >= 500 || error.name === "AuthRetryableFetchError"))
+    return { error: "AUTH_UNAVAILABLE", success: false };
   return { error: "", success: true };
 }
 export async function setPassword(_previous: { error: string }, data: FormData) {
   const parsed = z.string().min(12).max(128).safeParse(data.get("password"));
-  if (!parsed.success || data.get("password") !== data.get("confirm")) return { error: "PASSWORD_RULES" };
+  if (!parsed.success)
+    return {
+      ...fieldFailure("password", "MIN_LENGTH"),
+      fieldErrors: {
+        password: {
+          code: parsed.error.issues[0]?.code === "too_big" ? "MAX_LENGTH" : "MIN_LENGTH",
+          limit: parsed.error.issues[0]?.code === "too_big" ? 128 : 12,
+        },
+      },
+    };
+  if (data.get("password") !== data.get("confirm")) return fieldFailure("confirm", "PASSWORD_MATCH");
   const db = await serverClient();
   const {
     data: { user },
@@ -61,7 +74,7 @@ export async function invite(_previous: { error: string; success: boolean }, dat
       role: z.enum(["ADMIN", "MANAGER", "DISPATCHER"]),
     })
     .safeParse(Object.fromEntries(data));
-  if (!parsed.success) return { error: "INVALID_INPUT", success: false };
+  if (!parsed.success) return validationFailure(parsed.error, ["email", "role"]);
   const { data: operation, error } = await db.rpc("begin_staff_email", {
     p_email: parsed.data.email,
     p_role: parsed.data.role,
@@ -90,7 +103,7 @@ export async function invite(_previous: { error: string; success: boolean }, dat
     actionUrl.searchParams.set("type", type);
     const secret = process.env.SUPABASE_SECRET_KEY;
     if (!secret) return { error: "MAIL_CONFIGURATION", success: false };
-    console.log("URL function", new URL("/functions/v1/resend", supabaseEnvironment().url).toString())
+    console.log("URL function", new URL("/functions/v1/resend", supabaseEnvironment().url).toString());
     const result = await fetch(new URL("/functions/v1/resend", supabaseEnvironment().url), {
       method: "POST",
       headers: { apikey: secret, "Content-Type": "application/json" },
@@ -107,7 +120,13 @@ export async function invite(_previous: { error: string; success: boolean }, dat
     revalidatePath("/users");
     if (!result.ok || receipt.accepted !== true || typeof receipt.id !== "string") {
       return {
-        error: ["MAIL_CONFIGURATION", "MAIL_RATE_LIMITED", "MAIL_API_KEY_INVALID", "MAIL_DOMAIN_UNVERIFIED", "MAIL_TEST_RECIPIENT_ONLY"].includes(receipt.error)
+        error: [
+          "MAIL_CONFIGURATION",
+          "MAIL_RATE_LIMITED",
+          "MAIL_API_KEY_INVALID",
+          "MAIL_DOMAIN_UNVERIFIED",
+          "MAIL_TEST_RECIPIENT_ONLY",
+        ].includes(receipt.error)
           ? receipt.error
           : "INVITE_FAILED",
         success: false,
@@ -119,15 +138,25 @@ export async function invite(_previous: { error: string; success: boolean }, dat
     return { error: "INVITE_FAILED", success: false };
   }
 }
-export async function setActive(data: FormData) {
+export async function setActive(_previous: { error: string; success: boolean }, data: FormData) {
   const { db } = await requireStaff("users.manage");
   const parsed = z
     .object({ id: z.uuid(), active: z.enum(["true", "false"]) })
-    .parse(Object.fromEntries(data));
+    .safeParse(Object.fromEntries(data));
+  if (!parsed.success) return { error: "INVALID_INPUT", success: false };
   const { error } = await db.rpc("set_staff_active", {
-    p_id: parsed.id,
-    p_active: parsed.active === "true",
+    p_id: parsed.data.id,
+    p_active: parsed.data.active === "true",
   });
-  if (error) throw new Error(error.message.includes("LAST_ADMIN") ? "LAST_ADMIN" : "FORBIDDEN");
+  if (error)
+    return {
+      error: error.message.includes("LAST_ADMIN")
+        ? "LAST_ADMIN"
+        : error.message.includes("FORBIDDEN")
+          ? "FORBIDDEN"
+          : "UNAVAILABLE",
+      success: false,
+    };
   revalidatePath("/users");
+  return { error: "", success: true };
 }

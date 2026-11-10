@@ -1,5 +1,7 @@
 "use client";
+import type { FieldErrors, FormOutcome } from "@lm/types";
 import { Button, useLanguage } from "@lm/ui";
+import { ValidatedForm } from "@lm/ui/validated-form";
 import { type ReactNode, useId, useRef } from "react";
 
 export function ConfirmedForm({
@@ -9,13 +11,15 @@ export function ConfirmedForm({
   question,
   className = "stack",
   validate,
+  result,
 }: {
   action: (form: FormData) => void;
   children: ReactNode;
   values: string[];
   question: string;
   className?: string;
-  validate?: (data: FormData, action: string) => boolean;
+  validate?: (data: FormData, action: string) => FieldErrors;
+  result?: FormOutcome;
 }) {
   const { t } = useLanguage();
   const form = useRef<HTMLFormElement>(null);
@@ -24,17 +28,14 @@ export function ConfirmedForm({
   const approved = useRef(false);
   const title = useId();
   return (
-    <form
-      ref={form}
+    <ValidatedForm
+      result={result}
+      validate={validate}
       action={action}
       className={className}
       onSubmit={(event) => {
+        form.current = event.currentTarget;
         const button = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-        if (validate && !validate(new FormData(event.currentTarget), button?.value ?? "")) {
-          event.preventDefault();
-          approved.current = false;
-          return;
-        }
         if (approved.current) {
           approved.current = false;
           return;
@@ -59,12 +60,13 @@ export function ConfirmedForm({
               dialog.current?.close();
               approved.current = true;
               form.current?.requestSubmit(submitter.current ?? undefined);
+              approved.current = false;
             }}
           >
             {t("Confirmar", "Confirm")}
           </Button>
         </div>
       </dialog>
-    </form>
+    </ValidatedForm>
   );
 }

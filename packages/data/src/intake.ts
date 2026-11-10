@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash, createHmac } from "node:crypto";
 import { appUrl } from "@lm/config/env";
-import { FILE_LIMIT, publicIntakeSchema } from "@lm/validation";
+import { FILE_LIMIT, intakeV2Schema, publicIntakeSchema } from "@lm/validation";
 import sharp from "sharp";
 import { prepareIntakeV2 } from "./locations";
 import { privilegedClient } from "./privileged";
@@ -90,11 +90,25 @@ export async function beginIntake(request: Request) {
     throw new IntakeError("INVALID_INPUT");
   }
   const parsed = publicIntakeSchema.safeParse(body);
-  if (!parsed.success)
-    return Response.json(
-      { error: "INVALID_INPUT", fields: parsed.error.issues.map((issue) => issue.path.join(".")) },
-      { status: 400 },
-    );
+  if (!parsed.success) {
+    const fields = parsed.error.issues.map((issue) => issue.path.join("."));
+    // A union error stops at `data`; expand the known V2 branch for its visible controls.
+    // The original strict envelope remains authoritative (including key and honeypot).
+    if (
+      body &&
+      typeof body === "object" &&
+      "data" in body &&
+      body.data &&
+      typeof body.data === "object" &&
+      "version" in body.data &&
+      body.data.version === 2
+    ) {
+      const details = intakeV2Schema.safeParse(body.data);
+      if (!details.success)
+        fields.push(...details.error.issues.map((issue) => `data.${issue.path.join(".")}`));
+    }
+    return Response.json({ error: "INVALID_INPUT", fields }, { status: 400 });
+  }
   const token = createHmac("sha256", secret()).update(parsed.data.key).digest("hex");
   const { error } = await privilegedClient().rpc("intake_begin", {
     p_key: parsed.data.key,

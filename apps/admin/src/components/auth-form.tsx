@@ -1,5 +1,6 @@
 "use client";
 import { Button, LanguageSwitch, useLanguage } from "@lm/ui";
+import { FieldError, ValidatedForm } from "@lm/ui/validated-form";
 import Image from "next/image";
 import { useActionState } from "react";
 import { login, recover, setPassword } from "@/app/auth/actions";
@@ -87,14 +88,16 @@ export function LoginForm({ initialError = "" }: { initialError?: string }) {
     <AuthFrame>
       <h2 style={{ marginTop: 32 }}>{t("Bienvenido de nuevo", "Welcome back")}</h2>
       <p className="muted">{t("Accede al panel de operaciones.", "Sign in to the operations dashboard.")}</p>
-      <form action={action} className="stack">
+      <ValidatedForm result={state} action={action} className="stack">
         <label className="field">
           {t("Correo electrónico", "Email")}
           <input name="email" type="email" autoComplete="username" required />
+          <FieldError name="email" />
         </label>
         <label className="field">
           {t("Contraseña", "Password")}
           <input name="password" type="password" autoComplete="current-password" required />
+          <FieldError name="password" />
         </label>
         <ErrorMessage code={state.error || initialError} />
         <Button disabled={pending}>
@@ -103,7 +106,7 @@ export function LoginForm({ initialError = "" }: { initialError?: string }) {
         <a href="/auth/forgot" className="small muted">
           {t("¿Olvidaste tu contraseña?", "Forgot your password?")}
         </a>
-      </form>
+      </ValidatedForm>
       <p className="small muted" style={{ marginTop: 28 }}>
         {t("Acceso exclusivo para personal invitado.", "Access is limited to invited staff.")}
       </p>
@@ -116,10 +119,11 @@ export function RecoveryForm() {
   return (
     <AuthFrame>
       <h2 style={{ marginTop: 32 }}>{t("Recuperar acceso", "Recover access")}</h2>
-      <form action={action} className="stack">
+      <ValidatedForm result={state} action={action} className="stack">
         <label className="field">
           {t("Correo electrónico", "Email")}
           <input name="email" type="email" required autoComplete="email" />
+          <FieldError name="email" />
         </label>
         <ErrorMessage code={state.error} />
         {state.success && (
@@ -132,7 +136,7 @@ export function RecoveryForm() {
         )}
         <Button disabled={pending}>{t("Solicitar enlace", "Request link")}</Button>
         <a href="/login">{t("Volver al acceso", "Back to sign in")}</a>
-      </form>
+      </ValidatedForm>
     </AuthFrame>
   );
 }
@@ -142,7 +146,14 @@ export function PasswordForm() {
   return (
     <AuthFrame>
       <h2 style={{ marginTop: 32 }}>{t("Establece tu contraseña", "Set your password")}</h2>
-      <form action={action} className="stack">
+      <ValidatedForm
+        result={state}
+        action={action}
+        className="stack"
+        validate={(data): import("@lm/types").FieldErrors =>
+          data.get("password") !== data.get("confirm") ? { confirm: { code: "PASSWORD_MATCH" } } : {}
+        }
+      >
         <label className="field">
           {t("Nueva contraseña (mínimo 12 caracteres)", "New password (at least 12 characters)")}
           <input
@@ -153,14 +164,16 @@ export function PasswordForm() {
             autoComplete="new-password"
             required
           />
+          <FieldError name="password" />
         </label>
         <label className="field">
           {t("Confirmar contraseña", "Confirm password")}
           <input name="confirm" type="password" autoComplete="new-password" required />
+          <FieldError name="confirm" />
         </label>
         <ErrorMessage code={state.error} />
         <Button disabled={pending}>{t("Guardar contraseña", "Save password")}</Button>
-      </form>
+      </ValidatedForm>
     </AuthFrame>
   );
 }

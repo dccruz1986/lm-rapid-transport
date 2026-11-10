@@ -45,11 +45,15 @@ export function PageHeading({ es, en, subtitle }: { es: string; en: string; subt
     </div>
   );
 }
-export type FormResult = { error: string; success: boolean };
+export type FormResult = import("@lm/types").FormOutcome;
 export const initialResult: FormResult = { error: "", success: false };
 export function ResultNotice({ result }: { result: FormResult }) {
   const { t } = useLanguage();
   const messages: Record<string, [string, string]> = {
+    LAST_ADMIN: [
+      "Debe quedar al menos un administrador activo.",
+      "At least one administrator must remain active.",
+    ],
     MOVE_START_REQUIRED: [
       "Introduce la fecha y hora de llegada al origen.",
       "Enter the arrival date and time.",

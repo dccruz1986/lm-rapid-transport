@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { loadPlaces, withLocationTimeout } from "./google-places";
 import { useLanguage } from "./language";
+import { FieldError } from "./validated-form";
 
 type Suggestion = { id: string; label: string; prediction: google.maps.places.PlacePrediction };
 export type LocationValue = { input: string; resolution_token: string | null };
@@ -14,6 +15,8 @@ export type SelectedLocation = {
   precision: "ADDRESS" | "POSTAL_CODE";
 };
 export function LocationField({
+  name,
+  errorText,
   label,
   value,
   onChange,
@@ -22,6 +25,8 @@ export function LocationField({
   onPlaceSelect,
   onPlaceInvalid,
 }: {
+  name?: string;
+  errorText?: string;
   label: string;
   value: LocationValue;
   onChange: (v: LocationValue) => void;
@@ -211,6 +216,10 @@ export function LocationField({
         {label}
       </label>
       <input
+        name={name}
+        required={!!name}
+        minLength={3}
+        maxLength={300}
         id={id}
         role="combobox"
         aria-autocomplete="list"
@@ -249,6 +258,7 @@ export function LocationField({
           }
         }}
       />
+      {name && <FieldError name={name} />}
       {items.length > 0 && (
         <div className="location-suggestions">
           <div id={`${id}-list`} role="listbox" aria-label={label}>
@@ -265,7 +275,7 @@ export function LocationField({
       )}
       <p id={`${id}-status`} className={invalid ? "field-error" : "small muted"} role="status">
         {invalid
-          ? t("Introduce un ZIP o una dirección.", "Enter a ZIP code or address.")
+          ? (errorText ?? t("Introduce un ZIP o una dirección.", "Enter a ZIP code or address."))
           : loading
             ? t("Buscando…", "Searching…")
             : message}

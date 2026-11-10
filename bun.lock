@@ -97,6 +97,7 @@
         "@googlemaps/js-api-loader": "^2.1.3",
         "@types/google.maps": "^3.66.7",
         "@lm/types": "workspace:*",
+        "@lm/validation": "workspace:*",
         "@radix-ui/react-slot": "latest",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",

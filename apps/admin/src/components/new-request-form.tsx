@@ -1,7 +1,15 @@
 "use client";
+import type { FormOutcome } from "@lm/types";
 import { Button, useLanguage } from "@lm/ui";
 import { LocationField, type SelectedLocation } from "@lm/ui/location-field";
-import { adminRequestSchema, moveSizes } from "@lm/validation";
+import { FieldError, ValidatedForm } from "@lm/ui/validated-form";
+import {
+  adminRequestSchema,
+  moveSizes,
+  newRequestAliases,
+  newRequestFields,
+  validationFailure,
+} from "@lm/validation";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -25,7 +33,7 @@ export function NewRequestForm() {
   const operation = useRef<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [fields, setFields] = useState<string[]>([]);
+  const [feedback, setFeedback] = useState<FormOutcome>({ error: "", success: false });
   const [unknownDate, setUnknownDate] = useState(false);
   const [locations, setLocations] = useState({ origin: "", destination: "" });
   const [selected, setSelected] = useState<{
@@ -33,8 +41,6 @@ export function NewRequestForm() {
     destination: SelectedLocation | null;
   }>({ origin: null, destination: null });
   const [invalidPlaces, setInvalidPlaces] = useState({ origin: false, destination: false });
-  const fieldError = (name: string) =>
-    fields.includes(name) ? <small role="alert">{t("Revisa este campo.", "Check this field.")}</small> : null;
   return (
     <div className="stack">
       <PageHeading
@@ -45,7 +51,8 @@ export function NewRequestForm() {
           "Record a move received by phone or in person.",
         ]}
       />
-      <form
+      <ValidatedForm
+        result={feedback}
         className="panel stack"
         onSubmit={async (event) => {
           event.preventDefault();
@@ -66,24 +73,28 @@ export function NewRequestForm() {
           };
           const parsed = adminRequestSchema.safeParse(input);
           if (!parsed.success || invalidPlaces.origin || invalidPlaces.destination) {
-            setFields([
-              ...(!parsed.success ? parsed.error.issues.map((i) => String(i.path[0])) : []),
-              ...Object.entries(invalidPlaces)
-                .filter(([, invalid]) => invalid)
-                .map(([side]) => side),
-            ]);
-            setError("INVALID_INPUT");
+            const failed = !parsed.success
+              ? validationFailure(parsed.error, newRequestFields, newRequestAliases)
+              : { error: "", success: false, fieldErrors: {} };
+            failed.fieldErrors ??= {};
+            for (const side of ["origin", "destination"] as const)
+              if (invalidPlaces[side]) failed.fieldErrors[side] = { code: "LOCATION" };
+            setFeedback(failed);
+            setError(failed.error);
             return;
           }
           lock.current = true;
           setBusy(true);
           setError("");
-          setFields([]);
           try {
             const result = await createRequest(parsed.data);
-            if (result.error) {
+            if (result.error || ("fieldErrors" in result && Object.keys(result.fieldErrors ?? {}).length)) {
               setError(result.error);
-              setFields(result.fields);
+              setFeedback({
+                error: result.error,
+                success: false,
+                fieldErrors: "fieldErrors" in result ? result.fieldErrors : undefined,
+              });
             } else if ("id" in result && result.id) {
               router.push(`/requests/${result.id}`);
               router.refresh();
@@ -101,47 +112,29 @@ export function NewRequestForm() {
           <legend>{t("Contacto", "Contact")}</legend>
           <label className="field">
             {t("Nombre completo", "Full name")}
-            <input
-              name="full_name"
-              autoComplete="name"
-              required
-              maxLength={160}
-              aria-invalid={fields.includes("full_name")}
-            />
-            {fieldError("full_name")}
+            <input name="full_name" autoComplete="name" required maxLength={160} />
+            <FieldError name="full_name" />
           </label>
           <label className="field">
             {t("Teléfono de Estados Unidos", "US phone number")}
-            <input
-              name="phone"
-              type="tel"
-              autoComplete="tel"
-              required
-              maxLength={40}
-              aria-invalid={fields.includes("phone")}
-            />
-            {fieldError("phone")}
+            <input name="phone" type="tel" autoComplete="tel" required maxLength={40} />
+            <FieldError name="phone" />
           </label>
           <label className="field">
             {t("Correo electrónico (opcional)", "Email (optional)")}
-            <input
-              name="email"
-              type="email"
-              autoComplete="email"
-              maxLength={254}
-              aria-invalid={fields.includes("email")}
-            />
-            {fieldError("email")}
+            <input name="email" type="email" autoComplete="email" maxLength={254} />
+            <FieldError name="email" />
           </label>
         </fieldset>
         <fieldset className="stack" disabled={busy}>
           <legend>{t("Ubicaciones", "Locations")}</legend>
           {(["origin", "destination"] as const).map((side) => (
             <LocationField
+              name={side}
               key={side}
               label={side === "origin" ? t("Origen", "Pickup") : t("Destino", "Destination")}
               value={{ input: locations[side], resolution_token: null }}
-              invalid={fields.includes(side) || invalidPlaces[side]}
+              invalid={invalidPlaces[side]}
               disabled={busy}
               onChange={(value) => {
                 setSelected((previous) => ({ ...previous, [side]: null }));
@@ -167,7 +160,7 @@ export function NewRequestForm() {
           <legend>{t("Detalles de la mudanza", "Move details")}</legend>
           <label className="field">
             {t("Tamaño", "Move size")}
-            <select name="move_size" required defaultValue="" aria-invalid={fields.includes("move_size")}>
+            <select name="move_size" required defaultValue="">
               <option value="">{t("Selecciona el tamaño", "Select move size")}</option>
               {moveSizes.map((size) => (
                 <option key={size} value={size}>
@@ -175,7 +168,7 @@ export function NewRequestForm() {
                 </option>
               ))}
             </select>
-            {fieldError("move_size")}
+            <FieldError name="move_size" />
           </label>
           <label>
             <input type="checkbox" checked={unknownDate} onChange={(e) => setUnknownDate(e.target.checked)} />{" "}
@@ -183,14 +176,8 @@ export function NewRequestForm() {
           </label>
           <label className="field">
             {t("Fecha deseada", "Preferred date")}
-            <input
-              name="moving_date"
-              type="date"
-              required={!unknownDate}
-              disabled={unknownDate}
-              aria-invalid={fields.includes("moving_date")}
-            />
-            {fieldError("moving_date")}
+            <input name="moving_date" type="date" required={!unknownDate} disabled={unknownDate} />
+            <FieldError name="moving_date" />
             <small>
               {t("Una fecha futura, de lunes a sábado.", "A future date, Monday through Saturday.")}
             </small>
@@ -198,6 +185,7 @@ export function NewRequestForm() {
           <label className="field">
             {t("Comentarios (opcional)", "Comments (optional)")}
             <textarea name="comments" maxLength={4000} rows={3} />
+            <FieldError name="comments" />
           </label>
         </fieldset>
         {error && (
@@ -228,7 +216,7 @@ export function NewRequestForm() {
             </Button>
           )}
         </div>
-      </form>
+      </ValidatedForm>
     </div>
   );
 }

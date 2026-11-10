@@ -1,5 +1,6 @@
 "use server";
 import { requireStaff } from "@lm/data/server";
+import { validationFailure } from "@lm/validation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { FormResult } from "@/components/record-ui";
@@ -20,7 +21,19 @@ const schema = z.object({
 export async function savePricing(_previous: FormResult, form: FormData): Promise<FormResult> {
   const { db } = await requireStaff("pricing.manage");
   const parsed = schema.safeParse(Object.fromEntries(form));
-  if (!parsed.success) return { error: "INVALID_INPUT", success: false };
+  if (!parsed.success) {
+    const failure = validationFailure(parsed.error, [
+      "hourly_two",
+      "hourly_three",
+      "hourly_four",
+      "per_mile",
+      "minimum_hours",
+    ]);
+    for (const name of ["hourly_two", "hourly_three", "hourly_four", "per_mile"]) {
+      if (failure.fieldErrors?.[name]) failure.fieldErrors[name] = { code: "MONEY" };
+    }
+    return failure;
+  }
   const p = parsed.data;
   const { error } = await db.rpc("update_pricing_settings", {
     p_version: p.version,

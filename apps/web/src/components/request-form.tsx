@@ -1,8 +1,11 @@
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { FieldIssue } from "@lm/types";
 import { Button, useLanguage } from "@lm/ui";
+import { fieldMessage } from "@lm/ui/field-message";
 import { LocationField } from "@lm/ui/location-field";
 import {
+  issueCode,
   moveSizes,
   partialLocationSchema,
   type IntakeV2 as RequestInput,
@@ -10,12 +13,16 @@ import {
   validFileMetadata,
 } from "@lm/validation";
 import { ArrowRight, Check, CheckCircle2, FileImage } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { type FieldPath, useForm } from "react-hook-form";
 
 type Photo = { id: string; file: File; status: "pending" | "uploaded" | "failed" };
 export function RequestForm({ phone }: { phone: string }) {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const prefix = useId();
+  const element = useRef<HTMLFormElement>(null);
+  const [focus, setFocus] = useState<{ name: string } | null>(null);
+  const [photoError, setPhotoError] = useState("");
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -26,6 +33,8 @@ export function RequestForm({ phone }: { phone: string }) {
   const website = useRef<HTMLInputElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const form = useForm<RequestInput>({
+    mode: "onSubmit",
+    reValidateMode: "onChange",
     resolver: zodResolver(requestSchema),
     defaultValues: {
       version: 2,
@@ -51,6 +60,38 @@ export function RequestForm({ phone }: { phone: string }) {
   const { errors } = form.formState;
   form.watch(["origin", "destination"]);
   const hasSize = form.watch("property_size") !== null;
+  useEffect(() => {
+    if (!focus) return;
+    const c = element.current?.querySelector<HTMLElement>(`[name="${CSS.escape(focus.name)}"]`);
+    let p = c?.parentElement;
+    while (p) {
+      if (p instanceof HTMLDetailsElement) p.open = true;
+      p = p.parentElement;
+    }
+    c?.focus();
+  }, [focus]);
+  function reveal(names: string[]) {
+    const first = names[0];
+    if (!first) return;
+    setStep(
+      ["origin", "destination"].includes(first) ? 0 : ["full_name", "phone", "email"].includes(first) ? 2 : 1,
+    );
+    setFocus({ name: first });
+  }
+  function localError(name: FieldPath<RequestInput>) {
+    const error = form.getFieldState(name).error;
+    if (!error) return null;
+    const parsed = requestSchema.safeParse(form.getValues());
+    const issue = !parsed.success
+      ? parsed.error.issues.find((i) => i.path.join(".") === name || i.path[0] === name)
+      : undefined;
+    const code: FieldIssue = issue ? issueCode(issue) : { code: error.message ?? "INVALID" };
+    return (
+      <span className="field-error" id={`${prefix}-${name}`}>
+        {fieldMessage(code, locale)}
+      </span>
+    );
+  }
   const errorsText: Record<string, [string, string]> = {
     INVALID_INPUT: [
       "Revisa los campos indicados antes de continuar.",
@@ -98,7 +139,7 @@ export function RequestForm({ phone }: { phone: string }) {
   ) {
     const invalid = form.getFieldState(name).error;
     const type = options.type ?? "text";
-    const errorId = `error-${name}`;
+    const errorId = `${prefix}-${name}`;
     return (
       <label className="field" key={name}>
         {t(es, en)}
@@ -119,13 +160,7 @@ export function RequestForm({ phone }: { phone: string }) {
                   : undefined,
           })}
         />
-        {invalid && (
-          <span className="field-error" id={errorId}>
-            {errorsText[invalid.message ?? ""]
-              ? message(invalid.message ?? "")
-              : t("Revisa este campo.", "Check this field.")}
-          </span>
-        )}
+        {localError(name)}
       </label>
     );
   }
@@ -152,7 +187,10 @@ export function RequestForm({ phone }: { phone: string }) {
       setStep(step + 1);
       setError("");
       setTimeout(() => heading.current?.focus(), 0);
-    } else setError("INVALID_INPUT");
+    } else {
+      setError("");
+      reveal(keys.filter((key) => !!form.getFieldState(key).error));
+    }
   }
   async function api(path: string, body?: unknown, file?: File) {
     const response = await fetch(path, {
@@ -166,6 +204,26 @@ export function RequestForm({ phone }: { phone: string }) {
     const data = await response.json();
     if (!response.ok) {
       if (data.error === "INVALID_INPUT" && data.fields?.includes("website")) throw new Error("SPAM_CHECK");
+      if (data.error === "INVALID_INPUT" && Array.isArray(data.fields)) {
+        const names = [
+          ...new Set<string>(data.fields.map((path: string) => path.replace(/^data\./, "").split(".")[0])),
+        ].filter((name) => name in form.getValues() && !["version"].includes(name));
+        if (names.length) {
+          for (const name of names)
+            form.setError(name as FieldPath<RequestInput>, { type: "server", message: "INVALID" });
+          reveal(names);
+          const general = data.fields.some(
+            (path: string) =>
+              path !== "data" && !names.includes(path.replace(/^data\./, "").split(".")[0] ?? ""),
+          );
+          throw new Error(general ? "INVALID_INPUT" : "FIELD_ERRORS");
+        }
+      }
+      if (data.error === "INVALID_DATE" && !begun) {
+        form.setError("moving_date", { type: "server", message: "DATE_TOMORROW" });
+        reveal(["moving_date"]);
+        throw new Error("FIELD_ERRORS");
+      }
       throw new Error(data.error ?? "UNAVAILABLE");
     }
     return data;
@@ -195,6 +253,11 @@ export function RequestForm({ phone }: { phone: string }) {
           setPhotos((current) => current.map((p) => (p.id === photo.id ? { ...p, status: "uploaded" } : p)));
         } catch (error) {
           setPhotos((current) => current.map((p) => (p.id === photo.id ? { ...p, status: "failed" } : p)));
+          if (error instanceof Error && ["INVALID_FILE", "TOO_LARGE", "FILE_LIMIT"].includes(error.message)) {
+            setPhotoError(error.message === "TOO_LARGE" ? "INVALID_FILE" : error.message);
+            reveal(["photos"]);
+            throw new Error("FIELD_ERRORS");
+          }
           throw error;
         }
       }
@@ -202,7 +265,9 @@ export function RequestForm({ phone }: { phone: string }) {
       setResult(complete.request_number);
       setTimeout(() => heading.current?.focus(), 0);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "UNAVAILABLE");
+      setError(
+        error instanceof Error ? (error.message === "FIELD_ERRORS" ? "" : error.message) : "UNAVAILABLE",
+      );
     } finally {
       setBusy(false);
     }
@@ -273,12 +338,16 @@ export function RequestForm({ phone }: { phone: string }) {
         ))}
       </ol>
       <form
+        ref={element}
         onSubmit={(event) => {
           if (step < 2) {
             event.preventDefault();
             void advance();
           } else {
-            void form.handleSubmit(submit)(event);
+            void form.handleSubmit(submit, (invalid) => {
+              setError("");
+              reveal(Object.keys(invalid));
+            })(event);
           }
         }}
         noValidate
@@ -314,9 +383,14 @@ export function RequestForm({ phone }: { phone: string }) {
             <div className="stack">
               {(["origin", "destination"] as const).map((side) => (
                 <LocationField
+                  name={side}
                   key={side}
                   label={side === "origin" ? t("Origen", "Pickup") : t("Destino", "Destination")}
                   value={form.getValues(side)}
+                  errorText={t(
+                    "Introduce una ubicación de Florida con entre 3 y 300 caracteres.",
+                    "Enter a Florida location using 3 to 300 characters.",
+                  )}
                   onChange={(value) => form.setValue(side, value, { shouldValidate: true })}
                   invalid={
                     !!errors[side] ||
@@ -356,6 +430,7 @@ export function RequestForm({ phone }: { phone: string }) {
                 <select
                   {...form.register("move_size")}
                   aria-invalid={!!form.getFieldState("move_size").error}
+                  aria-describedby={form.getFieldState("move_size").error ? `${prefix}-move_size` : undefined}
                   defaultValue=""
                 >
                   <option value="" disabled>
@@ -378,7 +453,9 @@ export function RequestForm({ phone }: { phone: string }) {
                   ))}
                 </select>
                 {form.getFieldState("move_size").error && (
-                  <span className="field-error">{t("Selecciona el tamaño.", "Select a move size.")}</span>
+                  <span className="field-error" id={`${prefix}-move_size`}>
+                    {t("Selecciona el tamaño.", "Select a move size.")}
+                  </span>
                 )}
               </label>
               <details>
@@ -386,13 +463,20 @@ export function RequestForm({ phone }: { phone: string }) {
                 <div className="stack" style={{ marginTop: 20 }}>
                   <label className="field">
                     {t("Tipo de propiedad", "Property type")}
-                    <select {...form.register("property_type", { setValueAs: (v) => v || null })}>
+                    <select
+                      {...form.register("property_type", { setValueAs: (v) => v || null })}
+                      aria-invalid={!!form.getFieldState("property_type").error}
+                      aria-describedby={
+                        form.getFieldState("property_type").error ? `${prefix}-${"property_type"}` : undefined
+                      }
+                    >
                       <option value="">{t("Por definir", "Not specified")}</option>
                       <option value="HOUSE">{t("Casa", "House")}</option>
                       <option value="APARTMENT">{t("Apartamento", "Apartment")}</option>
                       <option value="OFFICE">{t("Oficina", "Office")}</option>
                       <option value="COMMERCIAL">{t("Comercial", "Commercial")}</option>
                     </select>
+                    {localError("property_type")}
                   </label>
                   {(["origin", "destination"] as const).map((side) => (
                     <div key={side} className="stack">
@@ -416,11 +500,24 @@ export function RequestForm({ phone }: { phone: string }) {
                             (side + "_elevator") as "origin_elevator" | "destination_elevator",
                             { setValueAs: (v) => (v === "" || v == null ? null : v === "true") },
                           )}
+                          aria-invalid={
+                            !!form.getFieldState(
+                              (side + "_elevator") as "origin_elevator" | "destination_elevator",
+                            ).error
+                          }
+                          aria-describedby={
+                            form.getFieldState(
+                              (side + "_elevator") as "origin_elevator" | "destination_elevator",
+                            ).error
+                              ? `${prefix}-${(side + "_elevator") as "origin_elevator" | "destination_elevator"}`
+                              : undefined
+                          }
                         >
                           <option value="">{t("No indicado", "Not specified")}</option>
                           <option value="true">{t("Sí", "Yes")}</option>
                           <option value="false">No</option>
                         </select>
+                        {localError((side + "_elevator") as "origin_elevator" | "destination_elevator")}
                       </label>
                     </div>
                   ))}
@@ -433,23 +530,43 @@ export function RequestForm({ phone }: { phone: string }) {
                       {...form.register("property_size", { setValueAs: (v) => (v ? Number(v) : null) })}
                       onChange={(e) => {
                         const n = e.target.value ? Number(e.target.value) : null;
-                        form.setValue("property_size", n);
-                        form.setValue("size_unit", n ? (form.getValues("size_unit") ?? "SQFT") : null);
+                        form.setValue("property_size", n, { shouldValidate: true });
+                        form.setValue("size_unit", n ? (form.getValues("size_unit") ?? "SQFT") : null, {
+                          shouldValidate: true,
+                        });
                       }}
+                      aria-invalid={!!form.getFieldState("property_size").error}
+                      aria-describedby={
+                        form.getFieldState("property_size").error ? `${prefix}-${"property_size"}` : undefined
+                      }
                     />
+                    {localError("property_size")}
                   </label>
                   {hasSize && (
                     <label className="field">
                       {t("Unidad", "Unit")}
-                      <select {...form.register("size_unit")}>
+                      <select
+                        {...form.register("size_unit")}
+                        aria-invalid={!!form.getFieldState("size_unit").error}
+                        aria-describedby={
+                          form.getFieldState("size_unit").error ? `${prefix}-${"size_unit"}` : undefined
+                        }
+                      >
                         <option value="SQFT">ft²</option>
                         <option value="SQM">m²</option>
                       </select>
+                      {localError("size_unit")}
                     </label>
                   )}
                   <label className="field">
                     {t("Equipo", "Crew")}
-                    <select {...form.register("workers", { setValueAs: (v) => (v ? Number(v) : null) })}>
+                    <select
+                      {...form.register("workers", { setValueAs: (v) => (v ? Number(v) : null) })}
+                      aria-invalid={!!form.getFieldState("workers").error}
+                      aria-describedby={
+                        form.getFieldState("workers").error ? `${prefix}-${"workers"}` : undefined
+                      }
+                    >
                       <option value="">{t("Necesito asesoría", "I need guidance")}</option>
                       {[2, 3, 4].map((n) => (
                         <option key={n} value={n}>
@@ -457,10 +574,19 @@ export function RequestForm({ phone }: { phone: string }) {
                         </option>
                       ))}
                     </select>
+                    {localError("workers")}
                   </label>
                   <label className="field">
                     {t("Comentarios", "Comments")}
-                    <textarea rows={3} {...form.register("comments")} />
+                    <textarea
+                      rows={3}
+                      {...form.register("comments")}
+                      aria-invalid={!!form.getFieldState("comments").error}
+                      aria-describedby={
+                        form.getFieldState("comments").error ? `${prefix}-${"comments"}` : undefined
+                      }
+                    />
+                    {localError("comments")}
                   </label>
                 </div>
               </details>
@@ -500,27 +626,40 @@ export function RequestForm({ phone }: { phone: string }) {
                 {t("Seleccionar fotografías", "Choose photos")}
                 <input
                   type="file"
+                  name="photos"
                   accept="image/jpeg,image/png,image/webp"
                   multiple
+                  aria-invalid={!!photoError}
+                  aria-describedby={photoError ? `${prefix}-photos` : undefined}
                   disabled={busy || begun}
                   onChange={(e) => {
                     const files = Array.from(e.target.files ?? []);
-                    if (photos.length + files.length > 8) {
-                      setError("FILE_LIMIT");
-                      return;
-                    }
-                    if (files.some((f) => !validFileMetadata(f))) {
-                      setError("INVALID_FILE");
-                      return;
-                    }
+                    const valid = files.filter(validFileMetadata);
+                    const accepted = valid.slice(0, Math.max(0, 8 - photos.length));
                     setPhotos((current) => [
                       ...current,
-                      ...files.map((file) => ({ id: crypto.randomUUID(), file, status: "pending" as const })),
+                      ...accepted.map((file) => ({
+                        id: crypto.randomUUID(),
+                        file,
+                        status: "pending" as const,
+                      })),
                     ]);
                     setError("");
+                    setPhotoError(
+                      valid.length !== files.length
+                        ? "INVALID_FILE"
+                        : accepted.length !== valid.length
+                          ? "FILE_LIMIT"
+                          : "",
+                    );
                     e.target.value = "";
                   }}
                 />
+                {photoError && (
+                  <span id={`${prefix}-photos`} className="field-error" role="alert">
+                    {message(photoError)}
+                  </span>
+                )}
               </label>
             </div>
             {photos.length > 0 && (

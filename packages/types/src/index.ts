@@ -16,3 +16,4 @@ export const moveStatuses = ["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED
 export type MoveStatus = (typeof moveStatuses)[number];
 export type PricingMode = "LOCAL" | "PER_MILE";
 export type ActionResult = { ok: boolean; message?: string };
+export type { FieldErrors, FieldIssue, FormOutcome } from "./form-errors";
