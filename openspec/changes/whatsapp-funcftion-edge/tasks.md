@@ -12,7 +12,7 @@
 
 ## 3. Alta de la solicitud
 
-- [ ] 3.1 Mapear respuestas al contrato de intake, conservar precisión territorial y finalizar con clave estable.
+- [x] 3.1 Mapear respuestas al contrato de intake, conservar precisión territorial y finalizar con clave estable.
 - [x] 3.2 Vincular borrador y solicitud y enviar la referencia recuperable tras confirmar el alta.
 
 ## 4. Verificación y operación

@@ -1,5 +1,6 @@
 create table private.whatsapp_conversations (
   id uuid primary key default gen_random_uuid(),
+  draft_id uuid not null default gen_random_uuid(),
   phone_number_id text not null,
   sender text not null,
   step text not null default 'START',
@@ -42,11 +43,10 @@ declare
   next_step text;
   next_answers jsonb;
   desired date;
-  contact uuid;
-  origin uuid;
-  destination uuid;
   created_request uuid;
   reference text;
+  intake_hash text;
+  intake_data jsonb;
   normalized_phone text;
   size_value text;
   editing_now boolean;
@@ -71,7 +71,7 @@ begin
     next_answers := '{}'::jsonb;
     editing_now := false;
     if c.step = 'DONE' then
-      update private.whatsapp_conversations set request_id = null where id = c.id;
+      update private.whatsapp_conversations set request_id = null, draft_id = gen_random_uuid() where id = c.id;
     end if;
     reply := 'Para solicitar una mudanza, ¿cuál es el ZIP o dirección de origen en Florida?';
   elsif c.step = 'ORIGIN' then
@@ -146,19 +146,30 @@ begin
         else 'Escribe el nuevo correo u OMITIR.' end;
     elsif upper(answer) = 'CONFIRMAR' then
       if c.request_id is null then
-        insert into public.customers(full_name, phone, email)
-          values(next_answers->>'full_name', next_answers->>'phone', next_answers->>'email')
-          on conflict(phone) do nothing returning id into contact;
-        if contact is null then select id into strict contact from public.customers where phone = next_answers->>'phone'; end if;
-        insert into public.addresses(input, postal_code, precision)
-          values(next_answers->>'origin', case when next_answers->>'origin' ~ '^[0-9]{5}$' then next_answers->>'origin' end, 'MANUAL') returning id into origin;
-        insert into public.addresses(input, postal_code, precision)
-          values(next_answers->>'destination', case when next_answers->>'destination' ~ '^[0-9]{5}$' then next_answers->>'destination' end, 'MANUAL') returning id into destination;
-        insert into public.moving_requests(customer_id, origin_id, destination_id, full_name, phone, email,
-          intake_version, move_size, moving_date, territorial_source, status)
-          values(contact, origin, destination, next_answers->>'full_name', next_answers->>'phone', next_answers->>'email',
-            2, next_answers->>'move_size', (next_answers->>'moving_date')::date, 'MANUAL', 'PENDING_REVIEW')
-          returning id, request_number into created_request, reference;
+        intake_hash := md5(c.draft_id::text) || md5('whatsapp:' || c.draft_id::text);
+        intake_data := jsonb_build_object(
+          'version', 2,
+          'full_name', next_answers->>'full_name',
+          'phone', next_answers->>'phone',
+          'email', next_answers->>'email',
+          'moving_date', next_answers->>'moving_date',
+          'move_size', next_answers->>'move_size',
+          'comments', '',
+          'territorial_source', 'MANUAL',
+          'origin', jsonb_build_object('input', next_answers->>'origin',
+            'postal_code', case when next_answers->>'origin' ~ '^[0-9]{5}$' then next_answers->>'origin' end,
+            'precision', 'MANUAL'),
+          'destination', jsonb_build_object('input', next_answers->>'destination',
+            'postal_code', case when next_answers->>'destination' ~ '^[0-9]{5}$' then next_answers->>'destination' end,
+            'precision', 'MANUAL'),
+          'bedrooms', case when next_answers->>'move_size' = 'STUDIO' then 0
+            when next_answers->>'move_size' ~ '^BEDROOMS_[1-4]$' then right(next_answers->>'move_size', 1)::integer end,
+          'property_type', case when next_answers->>'move_size' in ('OFFICE', 'COMMERCIAL') then next_answers->>'move_size' end
+        );
+        perform public.intake_begin(c.draft_id, intake_hash, intake_data);
+        reference := public.intake_finalize(intake_hash);
+        select request_id into strict created_request from private.intake_sessions where idempotency_key = c.draft_id;
+        update public.moving_requests set status = 'PENDING_REVIEW' where id = created_request;
         update private.whatsapp_conversations set request_id = created_request where id = c.id;
       else
         select request_number into reference from public.moving_requests where id = c.request_id;
